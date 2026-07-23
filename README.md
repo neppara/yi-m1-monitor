@@ -146,6 +146,26 @@ Highlights worth knowing before working with this camera:
 
 ---
 
+## Acknowledgements
+
+This project stands on earlier community reverse-engineering work. No third-party
+code is included here — the apps were written from scratch — but the following
+prior work was invaluable as a starting point for understanding the protocol,
+and the findings were independently re-verified against real hardware:
+
+- **[bullbin/xiaoyi_m1_re_liveview](https://github.com/bullbin/xiaoyi_m1_re_liveview)**
+  — the key predecessor: BLE pairing, the Wi-Fi HTTP protocol, and the UDP live-view
+  decoder.
+- **Qgrade/Yi-M1-mirrorless** — a fuller HTTP command table, credited in bullbin's
+  work. The repository has since been deleted; it was reconstructed here from live
+  testing rather than the original source.
+- **[fujihack](https://github.com/fujihack/fujihack)** / Daniel Cook (*petabyt*)
+  — firmware reverse-engineering methodology for the same OEM (Xacti) Fujifilm
+  X-series lineage; used as an approach, not as code.
+
+See [`fable research/related-projects-and-community.md`](fable%20research/related-projects-and-community.md)
+for the full survey of prior art.
+
 ## License
 
 [MIT](LICENSE). Covers the code and documentation in this repository. It does
