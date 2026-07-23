@@ -1,0 +1,10 @@
+<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" role="img">
+<title>YI M1 Monitor app icon</title>
+<desc>A minimalist camera glyph in amber on a dark background, matching the app's monochrome plus one accent color design system.</desc>
+<rect width="1024" height="1024" fill="#0c0d0f"/>
+<rect x="332" y="268" width="200" height="100" rx="24" fill="#f5a623"/>
+<rect x="152" y="340" width="720" height="480" rx="72" fill="#f5a623"/>
+<circle cx="512" cy="580" r="160" fill="#0c0d0f"/>
+<circle cx="512" cy="580" r="160" fill="none" stroke="#f5a623" stroke-width="28"/>
+<circle cx="512" cy="580" r="46" fill="#f5a623"/>
+</svg>

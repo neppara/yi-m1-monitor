@@ -1,0 +1,45 @@
+name: YiM1Monitor
+options:
+  bundleIdPrefix: com.yim1monitor
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+
+packages:
+  YiM1Core:
+    path: YiM1Core
+
+targets:
+  YiM1Monitor:
+    type: application
+    platform: iOS
+    sources:
+      - path: YiM1Monitor
+        excludes:
+          - "App/Info.plist"
+          - "Design/AppIcon.svg" # source artifact for the rasterized Assets.xcassets icon, not a runtime resource
+    dependencies:
+      - package: YiM1Core
+    info:
+      path: YiM1Monitor/App/Info.plist
+      properties:
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIRequiresFullScreen: true
+        NSBluetoothAlwaysUsageDescription: "YI M1 Monitor uses Bluetooth to pair with your camera and read its Wi-Fi credentials."
+        NSLocalNetworkUsageDescription: "YI M1 Monitor connects to your camera over its own Wi-Fi network to show live view and send camera commands."
+        NSPhotoLibraryAddUsageDescription: "YI M1 Monitor saves downloaded photos and videos to your Photos library."
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.yim1monitor.app
+        PRODUCT_NAME: YiM1Monitor
+        SWIFT_VERSION: 5.0
+        TARGETED_DEVICE_FAMILY: "1" # iPhone only (portrait-first v1 scope, Part 6)
+        GENERATE_INFOPLIST_FILE: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

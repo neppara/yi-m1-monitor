@@ -1,0 +1,7 @@
+
+venv/
+YI M1 Monitor.app/
+__pycache__/
+*.pyc
+build/
+*.pyc

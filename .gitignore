@@ -1,0 +1,49 @@
+# NOTE: .gitignore does NOT support end-of-line comments - a '#' only starts a
+# comment at the START of a line. Keep every pattern on its own bare line.
+
+# ---------------------------------------------------------------------------
+# Third-party / copyrighted material - MUST NOT be published (see README).
+# Xiaomi/YI firmware, the official APK, scraped manufacturer pages, and personal
+# sample media. Only our own code and findings ship.
+# ---------------------------------------------------------------------------
+research/
+yi-mirrorless-firmware-tools/
+*.apk
+*.bin
+*.bin.*
+*.dng
+*.DNG
+
+# Experiment output: 1500+ captured live-view frames. The prose findings in
+# 'fable research/*.md' are kept; the raw frame dumps are not.
+fable research/wifi-experiment-results/
+
+# ---------------------------------------------------------------------------
+# Build artifacts & environments
+# ---------------------------------------------------------------------------
+venv/
+__pycache__/
+*.pyc
+*.pyo
+build/
+dist/
+YI M1 Monitor.app/
+macos_app_template/AppIcon.icns
+
+yi-m1-ios/YiM1Monitor.xcodeproj/
+.build/
+DerivedData/
+*.xcuserstate
+
+# ---------------------------------------------------------------------------
+# OS / editor noise
+# ---------------------------------------------------------------------------
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# ---------------------------------------------------------------------------
+# Runtime output
+# ---------------------------------------------------------------------------
+*.log

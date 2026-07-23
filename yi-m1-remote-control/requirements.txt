@@ -1,0 +1,7 @@
+# Runtime dependencies for the macOS "YI M1 Monitor" app (python3 app/main.py).
+# Versions are what the app was developed and tested against; newer patch
+# releases are generally fine.
+PySide6==6.10.3      # Qt GUI
+bleak==0.21.1        # BLE pairing (CoreBluetooth backend)
+urllib3==1.26.9      # HTTP to the camera
+numpy==2.0.2         # focus-peaking edge detection (Sobel)

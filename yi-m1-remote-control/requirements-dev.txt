@@ -1,0 +1,7 @@
+# Extra dependencies for building the .app bundle and running the research
+# probe scripts. Not needed just to run the app (see requirements.txt).
+-r requirements.txt
+pyinstaller==6.21.0    # build the standalone macOS .app (YiM1Monitor.spec)
+opencv-python==5.0.0   # only used by the research/probe_*.py scripts (crop measurement);
+                       # the app itself deliberately does NOT use cv2 - it can't be imported
+                       # from a frozen bundle, so peaking is pure-numpy.
