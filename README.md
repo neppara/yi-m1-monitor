@@ -108,7 +108,12 @@ Core protocol logic lives in the `YiM1Core` Swift package and is unit-tested
 
 - Tested on one camera / firmware (`3.2-int`).
 - Video is recorded as H.264 **Constrained Baseline** (no B-frames, no CABAC) at a
-  fixed bitrate — quality is capped by the firmware, not by our tools.
+  fixed bitrate, and **this cannot be changed** — not by us, and not by reflashing the
+  main firmware. The encoder parameters are not in the main image at all; they live in
+  the Xacti subprocessor's own firmware, which `firmware.bin` does not contain. Four
+  independent searches establish this (`2160` never appears in `.rodata`, the 4.2 MB
+  `ND1` blob is fonts, and the `.ROM.*` sections are just the compressed copies of the
+  three sections we already have). See `fable research/firmware-memory-map.md`.
 - Recording is capped by a **4 GB file limit** (FAT32): ~7.5 min in 4K. The
   app's auto-restart works around it with a ~2 s gap between clips; the camera
   does **not** split files seamlessly.
