@@ -40,6 +40,8 @@ from datetime import datetime
 
 from urllib3 import PoolManager
 
+from probe_connect import connect_to_camera, restore_wifi
+
 CAMERA = "192.168.0.10"
 UDP_PORT = 54321
 CLIP_SECONDS = 3.0
@@ -293,9 +295,7 @@ def main():
     log("время: %s" % datetime.now().isoformat(timespec="seconds"))
     log("")
 
-    status, _ = send({"command": "GetCameraStatus"}, timeout=5.0)
-    if status is None:
-        log("НЕТ СВЯЗИ С КАМЕРОЙ (192.168.0.10). Проверь Wi-Fi.")
+    if not connect_to_camera(log):
         return
 
     threading.Thread(target=udp_listener, daemon=True).start()
@@ -322,6 +322,8 @@ def main():
         step("RCStopRemoteCtl", {"command": "RCStopRemoteCtl"})
         _udp_on = False
         time.sleep(0.3)
+        log("")
+        restore_wifi(log)
         log("")
         log("Лог: %s" % LOG)
         log("")

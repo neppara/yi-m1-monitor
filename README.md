@@ -122,7 +122,10 @@ Core protocol logic lives in the `YiM1Core` Swift package and is unit-tested
 
 The recovered protocol and the empirical camera behavior are documented in:
 
-- `fable research/rcvideoformatset-solved.md` — **start here**: how the video-format
+- `fable research/firmware-memory-map.md` — **read this before opening the firmware in
+  a disassembler**: the full section map, and the `.data` section everyone (us included)
+  forgets to load — without it no string cross-reference resolves.
+- `fable research/rcvideoformatset-solved.md` — how the video-format
   command was recovered from the firmware, the full parameter-key pool, and the
   hardware verification.
 - `fable research/` — the rest of the reverse-engineering write-ups (BLE handshake,

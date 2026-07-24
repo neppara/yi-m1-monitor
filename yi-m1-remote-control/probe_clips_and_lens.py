@@ -22,6 +22,8 @@ from datetime import datetime
 
 from urllib3 import PoolManager
 
+from probe_connect import connect_to_camera, restore_wifi
+
 INET_ADDRESS_CAMERA = "192.168.0.10"
 
 OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -205,18 +207,18 @@ def main():
     log("время: %s" % datetime.now().isoformat(timespec="seconds"))
     log("")
 
-    status, _ = send({"command": "GetCameraStatus"}, timeout=5.0)
-    if status is None:
-        log("НЕТ СВЯЗИ С КАМЕРОЙ (192.168.0.10). Проверь Wi-Fi.")
+    if not connect_to_camera(log):
         return
 
-    lens_and_camera_info()
-
-    if not lens_only:
-        clips()
-
-    log("")
-    log("Готово. Лог и файлы: %s" % OUT_DIR)
+    try:
+        lens_and_camera_info()
+        if not lens_only:
+            clips()
+    finally:
+        log("")
+        restore_wifi(log)
+        log("")
+        log("Готово. Лог и файлы: %s" % OUT_DIR)
 
 
 if __name__ == "__main__":
