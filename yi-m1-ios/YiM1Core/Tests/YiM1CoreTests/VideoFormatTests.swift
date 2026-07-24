@@ -27,16 +27,20 @@ final class VideoFormatTests: XCTestCase {
     /// sweep. Membership is the assertion - order only affects how the picker reads.
     func testShippedFormatsAreExactlyTheHardwareConfirmedSet() {
         XCTAssertEqual(Set(VideoFormat.allCases.map(\.rawValue)),
-                       ["4K_30", "4K_24", "4K_30_LOW", "2K_30",
+                       ["4K_30", "2K_30",
                         "FHD_60", "FHD_30", "FHD_24",
                         "720P_60", "720P_30", "720P_24", "VGA_240"])
     }
 
-    /// 24p is the headline capability - it appears in no menu on the camera body and was never
-    /// supported by the official app.
-    func testTwentyFourPModesExist() {
-        XCTAssertTrue(VideoFormat.allCases.contains(.uhd24))
+    /// 1080p24 is the headline capability - no menu on the camera offers it. 4K_24 was found in
+    /// the firmware but the camera reverts it to 4K_30 on record (hardware-verified), so it must
+    /// NOT ship; 4K is locked to 30p.
+    func testTwentyFourPIsFhdOnly() {
         XCTAssertTrue(VideoFormat.allCases.contains(.fhd24))
+        XCTAssertFalse(VideoFormat.allCases.map(\.rawValue).contains("4K_24"),
+                       "4K_24 is accepted but not applied - the camera reverts to 4K_30.")
+        XCTAssertFalse(VideoFormat.allCases.map(\.rawValue).contains("4K_30_LOW"),
+                       "4K_30_LOW is accepted but not applied - the camera reverts to 4K_30.")
     }
 
     func testEverySettingKeyResolvesToACommand() {
@@ -57,16 +61,11 @@ final class VideoFormatTests: XCTestCase {
     func testLabelsMarkTheModesTheCameraMenuCannotReach() {
         XCTAssertEqual(PrettyLabel.prettyLabel(for: .videoFormat, rawValue: "FHD_30"), "1080 30p")
         XCTAssertTrue(PrettyLabel.prettyLabel(for: .videoFormat, rawValue: "FHD_24").contains("★"))
-        XCTAssertTrue(PrettyLabel.prettyLabel(for: .videoFormat, rawValue: "4K_24").contains("★"))
     }
 
     /// The auto-restart tier is chosen by prefix-matching the metadata string, so a format the
     /// user can now select from the app must still land on the right timer.
     func testNewlySelectableFormatsStillPickARestartTier() {
-        XCTAssertEqual(RecordingAutoRestart.restartInterval(forVideoFormat: "4K_24"),
-                       RecordingAutoRestart.restartInterval(forVideoFormat: "4K_30"))
-        XCTAssertEqual(RecordingAutoRestart.restartInterval(forVideoFormat: "4K_30_LOW"),
-                       RecordingAutoRestart.restartInterval(forVideoFormat: "4K_30"))
         // FHD_60 falls through to the FHD tier. That tier is UNMEASURED for 60p - see the note
         // in RecordingAutoRestart; the fps self-stop detector is the safety net if it is wrong.
         XCTAssertEqual(RecordingAutoRestart.restartInterval(forVideoFormat: "FHD_60"),
@@ -110,8 +109,9 @@ final class RevivedVideoCommandTests: XCTestCase {
     func testOnlyHardwareConfirmedFormatsShip() {
         let values = Set(VideoFormat.allCases.map(\.rawValue))
         XCTAssertTrue(values.isSuperset(of: ["720P_60", "720P_30", "720P_24", "VGA_240"]))
-        XCTAssertFalse(values.contains("2880_24"), "accepted with HTTP 200 but never applied")
-        XCTAssertFalse(values.contains("1920_24"), "accepted with HTTP 200 but never applied")
+        for reverted in ["2880_24", "1920_24", "4K_24", "4K_30_LOW"] {
+            XCTAssertFalse(values.contains(reverted), "\(reverted): accepted but the camera reverts it")
+        }
         XCTAssertFalse(values.contains("VGA"), "returns a plain 404")
     }
 

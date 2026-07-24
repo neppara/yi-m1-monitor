@@ -150,10 +150,11 @@ Highlights worth knowing before working with this camera:
 - **Remote video-format switching, including 24p.** `RCVideoFormatSet` takes the
   parameter key **`Resolution`** (not `VideoFormat`) — recovered by disassembling
   the handler at `0x0015641c`, then confirmed on hardware and verified with
-  `ffprobe` on the recorded files. Working values: `4K_30`, `4K_24`, `4K_30_LOW`,
-  `2K_30`, `FHD_60`, `FHD_30`, `FHD_24`, `720P_60`, `720P_30`, `720P_24`, `VGA_240`.
-  **24p and 720p appear in no menu on the camera** and were never supported by the
-  official app.
+  `ffprobe` on the recorded files. Working values: `4K_30`, `2K_30`, `FHD_60`,
+  `FHD_30`, `FHD_24`, `720P_60`, `720P_30`, `720P_24`, `VGA_240`. `4K_24` and
+  `4K_30_LOW` are accepted (HTTP 200) but the camera reverts them to `4K_30` on
+  record — **4K is locked to 30p** — so they are not offered. **1080p24 and 720p
+  appear in no menu on the camera** and were never supported by the official app.
 - **Stabilisation, audio, mic noise reduction and mic level are controllable too.**
   `RCEisSwitchSet` / `RCVASwitchSet` / `RCVANoiseReduceSet` take the key `Operate`
   with **uppercase** `ON`/`OFF`; `RCVAVolSet` takes `Vol`. All four were previously

@@ -291,8 +291,6 @@ class RcVideoFormat(str, Enum):
     2K_24 or 2K_60 in the firmware. See 'fable research/rcvideoformatset-solved.md'.
     """
     UHD_30 = "4K_30"
-    UHD_24 = "4K_24"
-    UHD_30_Low = "4K_30_LOW"
     QHD_30 = "2K_30"
     FHD_60 = "FHD_60"
     FHD_30 = "FHD_30"
@@ -306,10 +304,10 @@ class RcVideoFormat(str, Enum):
     # verified with ffprobe. The YI M1 officially has no slow-motion mode at all; this was
     # sitting in the firmware the whole time.
     VGA_240 = "VGA_240"
-    # DELIBERATELY ABSENT - do not "restore" these: "2880_24" and "1920_24" are accepted by the
-    # command (HTTP 200) but the metadata never changes, i.e. the camera does NOT apply them.
-    # They are almost certainly leftovers of the multi-product Xacti ASDK platform, like
-    # StartMovieStream. "VGA" (without the frame rate) returns a plain 404.
+    # DELIBERATELY ABSENT - accepted by the command (HTTP 200) but NOT applied by the camera,
+    # which reverts to a working mode: "2880_24"/"1920_24" (metadata never changes) and
+    # "4K_24"/"4K_30_LOW" (revert to 4K_30 on record, user-verified on hardware 2026-07-24).
+    # 4K is locked to 30p. "VGA" (no frame rate) returns a plain 404. All Xacti-platform leftovers.
 
 
 class RcOnOff(str, Enum):

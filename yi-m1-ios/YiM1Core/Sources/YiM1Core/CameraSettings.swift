@@ -93,12 +93,13 @@ public enum FocusMode: String, SettingValue {
 /// were additionally verified end to end with ffprobe on the recorded files (24000/1001 and
 /// 30000/1001). See 'fable research/rcvideoformatset-solved.md'.
 ///
-/// uhd24 and fhd24 are worth calling out: 24p appears in NO menu on the camera body and was
-/// never supported by the official app. It is reachable only through this command.
+/// fhd24 is worth calling out: 1080p24 appears in NO menu on the camera body and was never
+/// supported by the official app. NOTE: 4K_24 and 4K_30_LOW exist as strings in .rodata and the
+/// command returns 200 for them, but the camera does NOT apply them - it reverts to 4K_30 (user-
+/// verified on hardware 2026-07-24). So 4K is locked to 30p; they are omitted here for the same
+/// reason as 2880_24/1920_24.
 public enum VideoFormat: String, SettingValue {
     case uhd30 = "4K_30"
-    case uhd24 = "4K_24"
-    case uhd30Low = "4K_30_LOW"
     case qhd30 = "2K_30"
     case fhd60 = "FHD_60"
     case fhd30 = "FHD_30"
