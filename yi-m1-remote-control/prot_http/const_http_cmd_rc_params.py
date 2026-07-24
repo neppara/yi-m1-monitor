@@ -261,3 +261,21 @@ class RcEvOffset(str, Enum):
     P4p3 = "4.3"
     P4p7 = "4.7"
     P5p0 = "5.0"
+class RcVideoFormat(str, Enum):
+    """Video resolution/frame-rate modes, sent as RCVideoFormatSet's "Resolution" parameter.
+
+    All seven strings were read out of the firmware's .rodata and all seven were accepted by a
+    real camera (2026-07-24); FHD_24 and FHD_30 were additionally verified end-to-end with
+    ffprobe on the recorded files (24000/1001 and 30000/1001 respectively).
+
+    NOTE: 4K_24 and FHD_24 are not offered anywhere in the camera's own menus and were never
+    supported by the official app - they are only reachable through this command. There is no
+    2K_24 or 2K_60 in the firmware. See 'fable research/rcvideoformatset-solved.md'.
+    """
+    UHD_30 = "4K_30"
+    UHD_24 = "4K_24"
+    UHD_30_Low = "4K_30_LOW"
+    QHD_30 = "2K_30"
+    FHD_60 = "FHD_60"
+    FHD_30 = "FHD_30"
+    FHD_24 = "FHD_24"

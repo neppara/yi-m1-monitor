@@ -185,3 +185,17 @@ class RcCmdStart(YiHttpCmd):
 class RcCmdStop(YiHttpCmd):
     def to_json(self) -> Dict[str, str]:
         return {"command":YiHttpCmdId.CMD_RC_STOP.value}
+class RcCmdSetVideoFormat(YiHttpCmd):
+    """Change the video resolution/frame rate remotely.
+
+    The parameter key is "Resolution" - NOT "VideoFormat", which is what the live-view metadata
+    field is called and what we (and everyone else) wrongly guessed for years. Recovered from
+    the firmware handler at 0x0015641c; see 'fable research/rcvideoformatset-solved.md'.
+    """
+    def __init__(self, video_format : RcVideoFormat):
+        super().__init__()
+        self.__format = video_format
+
+    def to_json(self) -> Dict[str, str]:
+        return {"command":YiHttpCmdId.CMD_RC_SET_VIDEO_FORMAT.value,
+                "Resolution":self.__format.value}

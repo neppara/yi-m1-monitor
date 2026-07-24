@@ -25,6 +25,7 @@ public enum SettingKey: String, CaseIterable, Sendable {
     case iso = "ISOSetting"
     case whiteBalance = "WB"
     case colorMode = "ColorMode"
+    case videoFormat = "VideoFormat"
 }
 
 /// A settable camera value. `rawValue` is the exact API string; `command()` builds the
@@ -78,6 +79,31 @@ public enum FocusMode: String, SettingValue {
 /// Not a settings-strip entry (used only by RCDoFocus, see Commands.swift), kept separate from
 /// FocusMode (the "current focus mode" setting) intentionally - the Python code keeps them as
 /// two different enums too (RcFocusMode vs RcTriggerFocusMode).
+/// Video resolution / frame rate, sent as RCVideoFormatSet's "Resolution" parameter.
+///
+/// The parameter name is the whole story here. It is NOT "VideoFormat" - that is only what the
+/// live-view *metadata* field is called, and guessing it (plus "Value" and "Mode") is why this
+/// command was written off as "returns 404, unreachable" for so long. The real key, "Resolution",
+/// was read out of the firmware handler at 0x0015641c; all seven values below then came straight
+/// from .rodata and every one was accepted by a real camera on 2026-07-24. FHD_24 and FHD_30
+/// were additionally verified end to end with ffprobe on the recorded files (24000/1001 and
+/// 30000/1001). See 'fable research/rcvideoformatset-solved.md'.
+///
+/// uhd24 and fhd24 are worth calling out: 24p appears in NO menu on the camera body and was
+/// never supported by the official app. It is reachable only through this command.
+public enum VideoFormat: String, SettingValue {
+    case uhd30 = "4K_30"
+    case uhd24 = "4K_24"
+    case uhd30Low = "4K_30_LOW"
+    case qhd30 = "2K_30"
+    case fhd60 = "FHD_60"
+    case fhd30 = "FHD_30"
+    case fhd24 = "FHD_24"
+    public static let settingKey = SettingKey.videoFormat
+    public static let commandName = "RCVideoFormatSet"
+    public static let paramName = "Resolution"
+}
+
 public enum TriggerFocusMode: String, Sendable {
     case auto = "Auto"
     case manual = "Manual"

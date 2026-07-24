@@ -41,11 +41,15 @@ struct SettingsStrip<Session: CameraSessionProtocol>: View {
                         chip(for: key)
                     }
                     if session.mode == .video {
-                        // Read-only: confirmed dead commands on the wire (RCVideoFormatSet/
-                        // RCVASwitchSet/etc. 404 despite valid firmware handlers - see
-                        // ARCHITECTURE.md) - these three only ever reflect metadata. The lock
-                        // glyph makes that legible instead of looking like a broken chip.
-                        readOnlyChip(title: "Format", value: session.metadata?.videoFormat ?? "—")
+                        // Format used to be a read-only chip here alongside Audio and EIS, because
+                        // RCVideoFormatSet was believed to 404 unconditionally. It doesn't - the
+                        // parameter key is "Resolution" (recovered 2026-07-24), so Format is now a
+                        // normal settable chip and is built by `chip(for:)` above via
+                        // SettingCatalog.videoOnlyKeys.
+                        //
+                        // Audio and EIS stay read-only: their handlers exist in the firmware too,
+                        // but nobody has recovered their parameter keys yet, so a tappable chip
+                        // would just fail silently. The lock glyph keeps that honest.
                         readOnlyChip(title: "Audio", value: session.metadata?.videoAudioSwitch ?? "—")
                         readOnlyChip(title: "EIS", value: session.metadata?.videoEis ?? "—")
                         autoRestartChip

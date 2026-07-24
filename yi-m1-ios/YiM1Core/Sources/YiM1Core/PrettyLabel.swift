@@ -17,6 +17,11 @@ public enum PrettyLabel {
                      "2SDelay": "2s timer", "10SDelay": "10s timer"],
         .colorMode: ["Standard": "Standard", "Portrait": "Portrait", "Vivid": "Vivid",
                      "NaturalBW": "B&W soft", "HContrastBW": "B&W hard"],
+        // The star marks the two modes that exist ONLY through RCVideoFormatSet - the camera's
+        // own menus never offer 24p.
+        .videoFormat: ["4K_30": "4K 30p", "4K_24": "4K 24p \u{2605}", "4K_30_LOW": "4K 30p (low)",
+                       "2K_30": "2K 30p", "FHD_60": "1080 60p", "FHD_30": "1080 30p",
+                       "FHD_24": "1080 24p \u{2605}"],
     ]
 
     /// Map a raw API value to a readable label for the given setting. Display only - see file

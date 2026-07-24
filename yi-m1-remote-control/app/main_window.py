@@ -49,13 +49,13 @@ from prot_http.command_http import (
     RcCmdSetCameraMode, RcCmdSetMeteringMode, RcCmdSetFocusingMode, RcCmdSetImageQuality,
     RcCmdSetImageAspect, RcCmdSetImageFormat, RcCmdSetDriveMode, RcCmdSetFStop,
     RcCmdSetShutterSpeed, RcCmdSetExposureValueOffset, RcCmdSetColorStyle,
-    RcCmdSetWhiteBalanceMode, RcCmdSetIso, RcCmdTriggerFocus,
+    RcCmdSetWhiteBalanceMode, RcCmdSetIso, RcCmdTriggerFocus, RcCmdSetVideoFormat,
     CmdFileList, CmdFileGet, CmdFileDelete,
 )
 from prot_http.const_http_cmd_rc_params import (
     RcExposureMode, RcMeteringMode, RcFocusMode, RcImageQuality, RcImageAspect, RcFileFormat,
     RcDriveMode, RcFStop, RcShutterSpeed, RcEvOffset, RcColorStyle, RcWhiteBalance, RcIso,
-    RcTriggerFocusMode,
+    RcTriggerFocusMode, RcVideoFormat,
 )
 from prot_http.const_http_enum_extra import CmdEnumFileQuality
 
@@ -108,7 +108,12 @@ MEASURED_PHOTO_CROPS = {
 SHARED_SETTING_KEYS = ["ExposureMode", "ISOSetting", "ShutterSpeed", "Fnumber", "EV", "WB",
                        "MeteringMode", "FocusMode", "ColorMode"]
 PHOTO_SETTING_KEYS = ["ImageQuality", "ImageAspect", "FileFormat", "DriveMode"]
-VIDEO_READONLY_KEYS = ["VideoFormat", "VASwitch", "VideoEis"]
+# VideoFormat became SETTABLE on 2026-07-24 (RCVideoFormatSet, parameter key "Resolution" -
+# see 'fable research/rcvideoformatset-solved.md'). It used to sit in the read-only list
+# below because the command was believed unreachable. Audio/EIS stay read-only for now: their
+# handlers exist too, but we have not recovered their parameter keys yet.
+VIDEO_SETTING_KEYS = ["VideoFormat"]
+VIDEO_READONLY_KEYS = ["VASwitch", "VideoEis"]
 
 # How many columns the settings grid uses. ~7 gives two rows for the photo strip (9 shared + 4
 # photo = 13) and video strip (9 + 3 = 12), so no horizontal scrolling.
@@ -130,6 +135,11 @@ _PRETTY_LABELS = {
                   "2SDelay": "2s timer", "10SDelay": "10s timer"},
     "ColorMode": {"Standard": "Standard", "Portrait": "Portrait", "Vivid": "Vivid",
                   "NaturalBW": "B&W soft", "HContrastBW": "B&W hard"},
+    # 4K_24 / FHD_24 are marked because they exist ONLY through this command - the
+    # camera's own menus never offer 24p.
+    "VideoFormat": {"4K_30": "4K 30p", "4K_24": "4K 24p \u2605", "4K_30_LOW": "4K 30p (low)",
+                    "2K_30": "2K 30p", "FHD_60": "1080 60p", "FHD_30": "1080 30p",
+                    "FHD_24": "1080 24p \u2605"},
 }
 
 
@@ -1079,14 +1089,15 @@ class MainWindow(QMainWindow):
             "ISOSetting": ("ISO", RcIso, RcCmdSetIso),
             "WB": ("WB", RcWhiteBalance, RcCmdSetWhiteBalanceMode),
             "ColorMode": ("Color", RcColorStyle, RcCmdSetColorStyle),
+            "VideoFormat": ("Format", RcVideoFormat, RcCmdSetVideoFormat),
         }
 
         # Build every chip once; _relayout_settings() places the mode-relevant ones into the
         # grid (wrapping to ~2 rows) and hides the rest - so switching modes never leaves holes.
-        for key in SHARED_SETTING_KEYS + PHOTO_SETTING_KEYS:
+        for key in SHARED_SETTING_KEYS + PHOTO_SETTING_KEYS + VIDEO_SETTING_KEYS:
             label, enum_cls, wrapper_cls = setting_defs[key]
             self._setting_chips[key] = self._make_setting_chip(label, enum_cls, wrapper_cls, key)
-        for cap, key in (("Format", "VideoFormat"), ("Audio", "VASwitch"), ("EIS", "VideoEis")):
+        for cap, key in (("Audio", "VASwitch"), ("EIS", "VideoEis")):
             chip, val = self._make_readonly_chip(cap)
             self._setting_chips[key] = chip
             self._video_readonly[key] = val
@@ -1105,7 +1116,8 @@ class MainWindow(QMainWindow):
         """Place the chips relevant to the current mode into the grid (shared + photo, or
         shared + video read-only), wrapping across SETTINGS_COLUMNS columns; hide the rest."""
         keys = SHARED_SETTING_KEYS + (
-            PHOTO_SETTING_KEYS if self._mode == "photo" else VIDEO_READONLY_KEYS + ["_AutoRestart"]
+            PHOTO_SETTING_KEYS if self._mode == "photo"
+            else VIDEO_SETTING_KEYS + VIDEO_READONLY_KEYS + ["_AutoRestart"]
         )
         # Hide + unparent everything first, then add-and-show the mode's chips. Order matters:
         # setVisible(True) must come AFTER addWidget reparents the chip, or Qt drops the visible

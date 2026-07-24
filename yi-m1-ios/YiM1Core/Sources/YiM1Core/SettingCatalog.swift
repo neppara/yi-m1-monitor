@@ -28,6 +28,7 @@ public enum SettingCatalog {
         .iso: (Iso.commandName, Iso.paramName),
         .whiteBalance: (WhiteBalance.commandName, WhiteBalance.paramName),
         .colorMode: (ColorStyle.commandName, ColorStyle.paramName),
+        .videoFormat: (VideoFormat.commandName, VideoFormat.paramName),
     ]
 
     /// Builds the full command dict for a setting, e.g. (.iso, "800") -> {"command":"RCISOSet","ISO":"800"}.
@@ -53,6 +54,7 @@ public enum SettingCatalog {
         case .iso: return Iso.allCases.map { SettingOption(rawValue: $0.rawValue, displayLabel: $0.displayLabel) }
         case .whiteBalance: return WhiteBalance.allCases.map { SettingOption(rawValue: $0.rawValue, displayLabel: $0.displayLabel) }
         case .colorMode: return ColorStyle.allCases.map { SettingOption(rawValue: $0.rawValue, displayLabel: $0.displayLabel) }
+        case .videoFormat: return VideoFormat.allCases.map { SettingOption(rawValue: $0.rawValue, displayLabel: $0.displayLabel) }
         }
     }
 
@@ -68,7 +70,13 @@ public enum SettingCatalog {
     /// The mode-aware key list (shared + photo-only when in Photo mode) - factored out (I6,
     /// 2026-07-12) so both the portrait `SettingsStrip` and the landscape settings sheet build
     /// the identical list instead of duplicating the expression in two SwiftUI files.
+    /// Video-only settings. `.videoFormat` became settable on 2026-07-24 once RCVideoFormatSet's
+    /// real parameter key ("Resolution") was recovered from the firmware - before that it was a
+    /// read-only metadata chip, because the command was believed to be unreachable. Audio and EIS
+    /// stay read-only for now: their handlers exist too, but their parameter keys are still unknown.
+    public static let videoOnlyKeys: [SettingKey] = [.videoFormat]
+
     public static func keys(forMode mode: CaptureMode) -> [SettingKey] {
-        sharedKeys + (mode == .photo ? photoOnlyKeys : [])
+        sharedKeys + (mode == .photo ? photoOnlyKeys : videoOnlyKeys)
     }
 }

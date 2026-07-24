@@ -751,7 +751,19 @@ class CameraSession(QThread):
 
     def _recording_restart_interval(self) -> float:
         """Picks the auto-restart interval for the last-seen VideoFormat metadata string, using
-        the same prefix-match convention as the iOS port (e.g. "4K_24" matches "4K")."""
+        the same prefix-match convention as the iOS port (e.g. "4K_24" matches "4K").
+
+        UNMEASURED CASE - FHD_60 (2026-07-24). These intervals were calibrated when the format
+        could only be set on the camera body and the user in practice shot FHD_30 / 4K_30. Now
+        that RCVideoFormatSet works ("Resolution" key), FHD_60 is one tap away, and its higher
+        bitrate may well hit the 4 GB file ceiling BEFORE this 29:55 timer fires - measured
+        FHD_30 is ~15.5 Mbit/s, and if 60p roughly doubles that, 4 GB arrives at roughly 17 min.
+        Nobody has timed a real FHD_60 clip yet, so no number is invented here. Consequence of
+        being wrong is bounded: the fps self-stop detector (the reactive layer) still catches the
+        camera stopping on its own and starts the next clip, it just reacts ~10-15 s later than a
+        correct proactive timer would. If someone times an FHD_60 clip to its natural end, add
+        the case here. Same caveat, in the opposite direction, for 4K_30_LOW: a lower bitrate
+        means 7:23 fires earlier than it needs to - safe, just wasteful."""
         fmt = (self._last_video_format or "").upper()
         if fmt.startswith("4K"):
             return self.RECORDING_AUTO_RESTART_4K_INTERVAL
