@@ -29,6 +29,12 @@ public enum SettingCatalog {
         .whiteBalance: (WhiteBalance.commandName, WhiteBalance.paramName),
         .colorMode: (ColorStyle.commandName, ColorStyle.paramName),
         .videoFormat: (VideoFormat.commandName, VideoFormat.paramName),
+        // Three switches share the key "Operate" but differ by command name, so they cannot all
+        // come from OnOff's static properties - the command name is spelled out per key here.
+        .videoEis: ("RCEisSwitchSet", OnOff.paramName),
+        .audioSwitch: ("RCVASwitchSet", OnOff.paramName),
+        .audioNoiseReduce: ("RCVANoiseReduceSet", OnOff.paramName),
+        .audioVolume: (AudioVolume.commandName, AudioVolume.paramName),
     ]
 
     /// Builds the full command dict for a setting, e.g. (.iso, "800") -> {"command":"RCISOSet","ISO":"800"}.
@@ -55,6 +61,9 @@ public enum SettingCatalog {
         case .whiteBalance: return WhiteBalance.allCases.map { SettingOption(rawValue: $0.rawValue, displayLabel: $0.displayLabel) }
         case .colorMode: return ColorStyle.allCases.map { SettingOption(rawValue: $0.rawValue, displayLabel: $0.displayLabel) }
         case .videoFormat: return VideoFormat.allCases.map { SettingOption(rawValue: $0.rawValue, displayLabel: $0.displayLabel) }
+        case .videoEis, .audioSwitch, .audioNoiseReduce:
+            return OnOff.allCases.map { SettingOption(rawValue: $0.rawValue, displayLabel: PrettyLabel.prettyLabel(for: key, rawValue: $0.rawValue)) }
+        case .audioVolume: return AudioVolume.allCases.map { SettingOption(rawValue: $0.rawValue, displayLabel: $0.displayLabel) }
         }
     }
 
@@ -74,7 +83,8 @@ public enum SettingCatalog {
     /// real parameter key ("Resolution") was recovered from the firmware - before that it was a
     /// read-only metadata chip, because the command was believed to be unreachable. Audio and EIS
     /// stay read-only for now: their handlers exist too, but their parameter keys are still unknown.
-    public static let videoOnlyKeys: [SettingKey] = [.videoFormat]
+    public static let videoOnlyKeys: [SettingKey] = [.videoFormat, .videoEis, .audioSwitch,
+                                                     .audioNoiseReduce, .audioVolume]
 
     public static func keys(forMode mode: CaptureMode) -> [SettingKey] {
         sharedKeys + (mode == .photo ? photoOnlyKeys : videoOnlyKeys)

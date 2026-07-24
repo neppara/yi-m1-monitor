@@ -21,7 +21,12 @@ public enum PrettyLabel {
         // own menus never offer 24p.
         .videoFormat: ["4K_30": "4K 30p", "4K_24": "4K 24p \u{2605}", "4K_30_LOW": "4K 30p (low)",
                        "2K_30": "2K 30p", "FHD_60": "1080 60p", "FHD_30": "1080 30p",
-                       "FHD_24": "1080 24p \u{2605}"],
+                       "FHD_24": "1080 24p \u{2605}",
+                       "720P_60": "720 60p", "720P_30": "720 30p", "720P_24": "720 24p",
+                       "VGA_240": "240fps slow-mo \u{2605}"],
+        .videoEis: ["ON": "On", "OFF": "Off"],
+        .audioSwitch: ["ON": "On", "OFF": "Off"],
+        .audioNoiseReduce: ["ON": "On", "OFF": "Off"],
     ]
 
     /// Map a raw API value to a readable label for the given setting. Display only - see file

@@ -50,12 +50,13 @@ from prot_http.command_http import (
     RcCmdSetImageAspect, RcCmdSetImageFormat, RcCmdSetDriveMode, RcCmdSetFStop,
     RcCmdSetShutterSpeed, RcCmdSetExposureValueOffset, RcCmdSetColorStyle,
     RcCmdSetWhiteBalanceMode, RcCmdSetIso, RcCmdTriggerFocus, RcCmdSetVideoFormat,
+    RcCmdSetEis, RcCmdSetAudio, RcCmdSetAudioNoiseReduce, RcCmdSetAudioVolume,
     CmdFileList, CmdFileGet, CmdFileDelete,
 )
 from prot_http.const_http_cmd_rc_params import (
     RcExposureMode, RcMeteringMode, RcFocusMode, RcImageQuality, RcImageAspect, RcFileFormat,
     RcDriveMode, RcFStop, RcShutterSpeed, RcEvOffset, RcColorStyle, RcWhiteBalance, RcIso,
-    RcTriggerFocusMode, RcVideoFormat,
+    RcTriggerFocusMode, RcVideoFormat, RcOnOff, RcAudioVolume,
 )
 from prot_http.const_http_enum_extra import CmdEnumFileQuality
 
@@ -112,8 +113,12 @@ PHOTO_SETTING_KEYS = ["ImageQuality", "ImageAspect", "FileFormat", "DriveMode"]
 # see 'fable research/rcvideoformatset-solved.md'). It used to sit in the read-only list
 # below because the command was believed unreachable. Audio/EIS stay read-only for now: their
 # handlers exist too, but we have not recovered their parameter keys yet.
-VIDEO_SETTING_KEYS = ["VideoFormat"]
-VIDEO_READONLY_KEYS = ["VASwitch", "VideoEis"]
+# Everything here became settable on 2026-07-24. All four of these commands were previously
+# filed as "dead - 404 despite a valid firmware handler"; every one of them was simply being sent
+# the wrong parameter name. Audio/EIS/noise-reduction take the key "Operate" with UPPERCASE
+# ON/OFF, volume takes "Vol". Confirmed live, metadata echoed each one back.
+VIDEO_SETTING_KEYS = ["VideoFormat", "VideoEis", "VASwitch", "VANR", "VAVol"]
+VIDEO_READONLY_KEYS = []
 
 # How many columns the settings grid uses. ~7 gives two rows for the photo strip (9 shared + 4
 # photo = 13) and video strip (9 + 3 = 12), so no horizontal scrolling.
@@ -137,9 +142,14 @@ _PRETTY_LABELS = {
                   "NaturalBW": "B&W soft", "HContrastBW": "B&W hard"},
     # 4K_24 / FHD_24 are marked because they exist ONLY through this command - the
     # camera's own menus never offer 24p.
+    "VideoEis": {"ON": "On", "OFF": "Off"},
+    "VASwitch": {"ON": "On", "OFF": "Off"},
+    "VANR": {"ON": "On", "OFF": "Off"},
     "VideoFormat": {"4K_30": "4K 30p", "4K_24": "4K 24p \u2605", "4K_30_LOW": "4K 30p (low)",
                     "2K_30": "2K 30p", "FHD_60": "1080 60p", "FHD_30": "1080 30p",
-                    "FHD_24": "1080 24p \u2605"},
+                    "FHD_24": "1080 24p \u2605",
+                    "720P_60": "720 60p", "720P_30": "720 30p", "720P_24": "720 24p",
+                    "VGA_240": "240fps slow-mo \u2605"},
 }
 
 
@@ -1090,6 +1100,10 @@ class MainWindow(QMainWindow):
             "WB": ("WB", RcWhiteBalance, RcCmdSetWhiteBalanceMode),
             "ColorMode": ("Color", RcColorStyle, RcCmdSetColorStyle),
             "VideoFormat": ("Format", RcVideoFormat, RcCmdSetVideoFormat),
+            "VideoEis": ("Stabilise", RcOnOff, RcCmdSetEis),
+            "VASwitch": ("Audio", RcOnOff, RcCmdSetAudio),
+            "VANR": ("Mic NR", RcOnOff, RcCmdSetAudioNoiseReduce),
+            "VAVol": ("Mic level", RcAudioVolume, RcCmdSetAudioVolume),
         }
 
         # Build every chip once; _relayout_settings() places the mode-relevant ones into the
@@ -1097,10 +1111,6 @@ class MainWindow(QMainWindow):
         for key in SHARED_SETTING_KEYS + PHOTO_SETTING_KEYS + VIDEO_SETTING_KEYS:
             label, enum_cls, wrapper_cls = setting_defs[key]
             self._setting_chips[key] = self._make_setting_chip(label, enum_cls, wrapper_cls, key)
-        for cap, key in (("Audio", "VASwitch"), ("EIS", "VideoEis")):
-            chip, val = self._make_readonly_chip(cap)
-            self._setting_chips[key] = chip
-            self._video_readonly[key] = val
         # Auto-restart toggle as a first-class strip chip (2026-07-19, iOS parity) - it used to
         # be discoverable only inside the Connection menu; now its state reads at a glance.
         self._setting_chips["_AutoRestart"] = self._make_autorestart_chip()

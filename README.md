@@ -87,7 +87,7 @@ open YiM1Monitor.xcodeproj    # set your signing team, then build to your iPhone
 ```
 
 Core protocol logic lives in the `YiM1Core` Swift package and is unit-tested
-(`swift test`, 38 tests) — no camera required to run those.
+(`swift test`, 53 tests) — no camera required to run those.
 
 ---
 
@@ -135,13 +135,23 @@ The recovered protocol and the empirical camera behavior are documented in:
 
 Highlights worth knowing before working with this camera:
 
+- **A hidden 240 fps slow-motion mode.** `VGA_240` records 640×480 at ~240 fps and
+  the camera conforms it to a 30 fps file itself — a 3-second take came back as a
+  690-frame, 23-second clip, i.e. ~8× slow motion straight off the card. The YI M1
+  has no slow-motion mode in any menu.
 - **Remote video-format switching, including 24p.** `RCVideoFormatSet` takes the
   parameter key **`Resolution`** (not `VideoFormat`) — recovered by disassembling
   the handler at `0x0015641c`, then confirmed on hardware and verified with
-  `ffprobe` on the recorded files. Accepted values: `4K_30`, `4K_24`, `2K_30`,
-  `FHD_60`, `FHD_30`, `FHD_24`, `4K_30_LOW`. **`4K_24` and `FHD_24` are not
-  offered anywhere in the camera's own menus** and were never supported by the
-  official app. Full write-up: `fable research/rcvideoformatset-solved.md`.
+  `ffprobe` on the recorded files. Working values: `4K_30`, `4K_24`, `4K_30_LOW`,
+  `2K_30`, `FHD_60`, `FHD_30`, `FHD_24`, `720P_60`, `720P_30`, `720P_24`, `VGA_240`.
+  **24p and 720p appear in no menu on the camera** and were never supported by the
+  official app.
+- **Stabilisation, audio, mic noise reduction and mic level are controllable too.**
+  `RCEisSwitchSet` / `RCVASwitchSet` / `RCVANoiseReduceSet` take the key `Operate`
+  with **uppercase** `ON`/`OFF`; `RCVAVolSet` takes `Vol`. All four were previously
+  recorded — by us and by everyone else — as dead commands that return 404.
+- Extra shutter speeds the API accepts but the menus don't list: `1/8000s`,
+  `1/6400s`, `1/5000s`.
 - Command failures are reported as **HTTP 200 with `{"code":<err>}` in the body**
   — and success is `code: 200`, not `code: 0`. Transport status alone lies.
 - A command sent **without its required parameter returns the same 404** as a

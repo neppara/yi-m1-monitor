@@ -116,7 +116,7 @@ def udp_listener():
                 except (socket.timeout, OSError):
                     continue
                 for key in (b"VideoFormat", b"ShutterSpeed", b"Fnumber", b"ImageQuality",
-                            b"WB", b"DialMode"):
+                            b"WB", b"DialMode", b"VASwitch", b"VideoEis", b"VAVol", b"VANR"):
                     m = re.search(b'"' + key + b'"\\s*:\\s*"([^"]*)"', data)
                     if m:
                         _meta[key.decode()] = m.group(1).decode("ascii", "replace")
@@ -138,7 +138,7 @@ def meta_after(key, want, wait=3.0):
 BOGUS = [
     ("RCVideoFormatSet", "Resolution", "ZZ_NOT_A_FORMAT_99"),
     ("RCVideoFormatSet", "Resolution", "8K_120"),
-    ("RCShutterSpeedSet", "dShutterSpeed", "1/99999s"),
+    ("RCShutterSpeedSet", "ShutterSpeed", "1/99999s"),
     ("RCFNSet", "Fnumber", "99.9"),
     ("RCISOSet", "ISO", "999999"),
 ]
@@ -147,7 +147,26 @@ NEW_VIDEO = ["2880_24", "1920_24", "720P_60", "720P_30", "720P_24", "VGA_240", "
 NEW_SHUTTER = ["1/8000s", "1/6400s", "1/5000s", "1/3000s", "1/1700s", "TIME10", "TIME2"]
 NEW_FSTOP = ["2.9", "3.6", "6.4", "8.4", "10.0", "11.0"]
 NEW_QUALITY = ["27", "14"]
-NEW_MISC = [("RCWBSet", "WBMode", "CWB"), ("RCSwitchDialMode", "DialMode", "Scene")]
+NEW_MISC = [("RCWBSet", "WB", "CWB"), ("RCSwitchDialMode", "DialMode", "Scene")]
+
+# Команды, которые числились "не работают, 404", с ключами и значениями, вынутыми из прошивки
+# (AGENT_RESULT_04 + доразыменование указателей вручную). Значения НЕ угаданы: строки "ON"/"OFF"
+# лежат по 0x1540f0/0x1540f4 и на них прямо ссылаются обработчики - обрати внимание, они
+# ЗАГЛАВНЫЕ, вариант "On"/"Off" не сработал бы.
+PREVIOUSLY_404 = [
+    ("стабилизация выкл",  "RCEisSwitchSet",      "Operate",   "OFF"),
+    ("стабилизация вкл",   "RCEisSwitchSet",      "Operate",   "ON"),
+    ("звук выкл",          "RCVASwitchSet",       "Operate",   "OFF"),
+    ("звук вкл",           "RCVASwitchSet",       "Operate",   "ON"),
+    ("шумодав выкл",       "RCVANoiseReduceSet",  "Operate",   "OFF"),
+    ("шумодав вкл",        "RCVANoiseReduceSet",  "Operate",   "ON"),
+    ("громкость 50",       "RCVAVolSet",          "Vol",       "50"),
+]
+
+# Ручная фокусировка по проводу: ключ "Operation" (0x1564e4), значения NearF/NearS/FarF/FarS
+# (0x1564f0..0x156508) - "Near/Far" + "Fast/Slow". Для нашего экземпляра, скорее всего, впустую:
+# китовый объектив электронно не опознаётся, а мануальное стекло мотора не имеет.
+MF_ADJUST = ["NearS", "FarS"]
 
 
 def negative_control():
@@ -218,7 +237,7 @@ def probe_simple(strict):
     log("=" * 72)
     log("ЭТАП 4. ОСТАЛЬНЫЕ СКРЫТЫЕ ЗНАЧЕНИЯ")
     log("=" * 72)
-    groups = [("выдержка", "RCShutterSpeedSet", "dShutterSpeed", "ShutterSpeed", NEW_SHUTTER),
+    groups = [("выдержка", "RCShutterSpeedSet", "ShutterSpeed", "ShutterSpeed", NEW_SHUTTER),
               ("диафрагма", "RCFNSet", "Fnumber", "Fnumber", NEW_FSTOP),
               ("качество", "RCImageQualitySet", "ImageQuality", "ImageQuality", NEW_QUALITY)]
     for title, cmd, key, meta_key, values in groups:
@@ -233,6 +252,40 @@ def probe_simple(strict):
     log("  === прочее ===")
     for cmd, key, val in NEW_MISC:
         step("%s %s=%s" % (cmd, key, val), {"command": cmd, key: val})
+
+
+def probe_previously_404():
+    """Главный этап после видеоформатов: команды, годами числившиеся мёртвыми.
+
+    Ровно как с RCVideoFormatSet, 404 у них мог означать просто ненайденный ключ, а не
+    отсутствие поддержки. Ключи и значения теперь вынуты из прошивки, а не угаданы.
+    """
+    log("")
+    log("=" * 72)
+    log("ЭТАП 5. КОМАНДЫ, ЧИСЛИВШИЕСЯ МЁРТВЫМИ (ключи из прошивки)")
+    log("=" * 72)
+    log("Значения ON/OFF взяты по адресам 0x1540f0/0x1540f4 - ЗАГЛАВНЫЕ, не 'On'/'Off'.")
+    log("")
+    worked = []
+    for title, cmd, key, val in PREVIOUSLY_404:
+        if step("%-20s %s %s=%s" % (title, cmd, key, val), {"command": cmd, key: val}):
+            worked.append("%s=%s" % (cmd, val))
+        time.sleep(0.4)
+    log("")
+    log("  === ручная фокусировка (RCMFAdjust) ===")
+    log("  Для нашей камеры, скорее всего, впустую - объектив электронно не опознаётся.")
+    for val in MF_ADJUST:
+        if step("RCMFAdjust Operation=%s" % val,
+                {"command": "RCMFAdjust", "Operation": val}):
+            worked.append("RCMFAdjust=%s" % val)
+        time.sleep(0.4)
+    log("")
+    log("  ЗАРАБОТАЛО: %s" % (", ".join(worked) if worked else "ничего"))
+    log("")
+    log("  Напоминание: 'принято' проверяй по метаданным ниже - поля VASwitch/VideoEis")
+    log("  показывают, что камера реально применила.")
+    for k in ("VASwitch", "VideoEis", "VAVol", "VANR"):
+        log("      метаданные %-10s = %r" % (k, _meta.get(k)))
 
 
 def main():
@@ -259,6 +312,7 @@ def main():
         confirmed, baseline = probe_video(strict)
         record_clips(confirmed)
         probe_simple(strict)
+        probe_previously_404()
     finally:
         log("")
         log("=== Возвращаем исходный формат и закрываем сессию ===")

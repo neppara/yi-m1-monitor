@@ -22,11 +22,14 @@ final class VideoFormatTests: XCTestCase {
         XCTAssertEqual(VideoFormat.commandName, "RCVideoFormatSet")
     }
 
-    /// All seven strings exist in the firmware's .rodata and all seven were accepted by the
-    /// camera. Order matters only for the picker; membership is the real assertion.
-    func testAllSevenFirmwareValuesArePresent() {
+    /// Every mode the shipping picker offers, and nothing else. All eleven were accepted by a real
+    /// camera; the four 720p/slow-motion entries were added after the 2026-07-24 hidden-value
+    /// sweep. Membership is the assertion - order only affects how the picker reads.
+    func testShippedFormatsAreExactlyTheHardwareConfirmedSet() {
         XCTAssertEqual(Set(VideoFormat.allCases.map(\.rawValue)),
-                       ["4K_30", "4K_24", "4K_30_LOW", "2K_30", "FHD_60", "FHD_30", "FHD_24"])
+                       ["4K_30", "4K_24", "4K_30_LOW", "2K_30",
+                        "FHD_60", "FHD_30", "FHD_24",
+                        "720P_60", "720P_30", "720P_24", "VGA_240"])
     }
 
     /// 24p is the headline capability - it appears in no menu on the camera body and was never
@@ -68,5 +71,59 @@ final class VideoFormatTests: XCTestCase {
         // in RecordingAutoRestart; the fps self-stop detector is the safety net if it is wrong.
         XCTAssertEqual(RecordingAutoRestart.restartInterval(forVideoFormat: "FHD_60"),
                        RecordingAutoRestart.restartInterval(forVideoFormat: "FHD_30"))
+    }
+}
+
+/// The four commands that were filed as "dead - 404 despite a valid firmware handler" until the
+/// parameter names were recovered on 2026-07-24. Each assertion below is the exact request that
+/// a real camera accepted and echoed back through live-view metadata.
+final class RevivedVideoCommandTests: XCTestCase {
+
+    func testStabilisationUsesOperateWithUppercaseValues() {
+        XCTAssertEqual(SettingCatalog.command(for: .videoEis, rawValue: "ON"),
+                       ["command": "RCEisSwitchSet", "Operate": "ON"])
+        XCTAssertEqual(SettingCatalog.command(for: .videoEis, rawValue: "OFF"),
+                       ["command": "RCEisSwitchSet", "Operate": "OFF"])
+    }
+
+    func testAudioSwitchAndNoiseReductionShareTheOperateKey() {
+        XCTAssertEqual(SettingCatalog.command(for: .audioSwitch, rawValue: "OFF"),
+                       ["command": "RCVASwitchSet", "Operate": "OFF"])
+        XCTAssertEqual(SettingCatalog.command(for: .audioNoiseReduce, rawValue: "ON"),
+                       ["command": "RCVANoiseReduceSet", "Operate": "ON"])
+    }
+
+    func testMicLevelUsesVol() {
+        XCTAssertEqual(SettingCatalog.command(for: .audioVolume, rawValue: "50"),
+                       ["command": "RCVAVolSet", "Vol": "50"])
+    }
+
+    /// Lowercase "On"/"Off" 404s on the real camera - the firmware compares against uppercase
+    /// literals at 0x1540f0/0x1540f4. Guard the casing explicitly.
+    func testOnOffValuesAreUppercase() {
+        XCTAssertEqual(Set(OnOff.allCases.map(\.rawValue)), ["ON", "OFF"])
+    }
+
+    /// 720p and the slow-motion mode were confirmed by metadata; the two that the camera accepted
+    /// but never actually applied must stay out, or the picker would offer a mode that silently
+    /// does nothing.
+    func testOnlyHardwareConfirmedFormatsShip() {
+        let values = Set(VideoFormat.allCases.map(\.rawValue))
+        XCTAssertTrue(values.isSuperset(of: ["720P_60", "720P_30", "720P_24", "VGA_240"]))
+        XCTAssertFalse(values.contains("2880_24"), "accepted with HTTP 200 but never applied")
+        XCTAssertFalse(values.contains("1920_24"), "accepted with HTTP 200 but never applied")
+        XCTAssertFalse(values.contains("VGA"), "returns a plain 404")
+    }
+
+    func testSlowMotionIsLabelledSoItIsNotMistakenForAPlainVGAMode() {
+        XCTAssertTrue(PrettyLabel.prettyLabel(for: .videoFormat, rawValue: "VGA_240")
+                        .lowercased().contains("slow"))
+    }
+
+    func testEveryVideoOnlyKeyIsSettable() {
+        for key in SettingCatalog.videoOnlyKeys {
+            XCTAssertNotNil(SettingCatalog.commandInfo[key], "\(key) has no command mapping")
+            XCTAssertFalse(SettingCatalog.options(for: key).isEmpty, "\(key) has no options")
+        }
     }
 }

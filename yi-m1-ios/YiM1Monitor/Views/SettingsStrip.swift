@@ -41,17 +41,12 @@ struct SettingsStrip<Session: CameraSessionProtocol>: View {
                         chip(for: key)
                     }
                     if session.mode == .video {
-                        // Format used to be a read-only chip here alongside Audio and EIS, because
-                        // RCVideoFormatSet was believed to 404 unconditionally. It doesn't - the
-                        // parameter key is "Resolution" (recovered 2026-07-24), so Format is now a
-                        // normal settable chip and is built by `chip(for:)` above via
+                        // There are no read-only video chips left. Format, stabilisation, audio,
+                        // mic noise reduction and mic level were ALL filed as "dead commands - 404
+                        // despite valid firmware handlers" until 2026-07-24, when it turned out
+                        // every one of them was just being sent the wrong parameter name. They are
+                        // ordinary settable chips now, built by `chip(for:)` above from
                         // SettingCatalog.videoOnlyKeys.
-                        //
-                        // Audio and EIS stay read-only: their handlers exist in the firmware too,
-                        // but nobody has recovered their parameter keys yet, so a tappable chip
-                        // would just fail silently. The lock glyph keeps that honest.
-                        readOnlyChip(title: "Audio", value: session.metadata?.videoAudioSwitch ?? "—")
-                        readOnlyChip(title: "EIS", value: session.metadata?.videoEis ?? "—")
                         autoRestartChip
                     }
                 }

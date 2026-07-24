@@ -58,6 +58,17 @@ class RcDriveMode(str, Enum):
     Delay10 = "10SDelay"
 
 class RcFStop(str, Enum):
+    # Confirmed live 2026-07-24 by metadata echo. WEAKER EVIDENCE than the other additions:
+    # RCFNSet was the one command that accepted a deliberately bogus value ("99.9") in the
+    # negative control, so "accepted" alone proves nothing for it. The likely reason is that
+    # the test camera has no electronically recognised lens, so there is no aperture to
+    # actually drive and the value is just stored. Metadata did echo these four back exactly.
+    # Also learned: 10.0/11.0 get normalised by the camera to "10"/"11", so the existing
+    # no-decimal spelling was right.
+    F2p9 = "2.9"
+    F3p6 = "3.6"
+    F6p4 = "6.4"
+    F8p4 = "8.4"
     F1p0 = "1.0"
     F1p2 = "1.2"
     F1p4 = "1.4"
@@ -164,6 +175,13 @@ class RcWhiteBalance(str, Enum):
     K11500 = "11500"
 
 class RcShutterSpeed(str, Enum):
+    # Confirmed live 2026-07-24 (accepted + echoed by metadata). These were missing from
+    # the upstream bullbin mapping our list came from - the firmware has more values than
+    # that map documented. NOTE: 1/3000s, 1/1700s, TIME2, TIME10 also exist as strings in
+    # the firmware but did NOT take on hardware (metadata stayed put), so they are omitted.
+    SF8000 = "1/8000s"
+    SF6400 = "1/6400s"
+    SF5000 = "1/5000s"
     Time = "TIME"
     Bulb = "BULB"
     S60 = "60s"
@@ -279,3 +297,37 @@ class RcVideoFormat(str, Enum):
     FHD_60 = "FHD_60"
     FHD_30 = "FHD_30"
     FHD_24 = "FHD_24"
+    # Confirmed live 2026-07-24: accepted AND echoed back by the live-view metadata.
+    HD_60 = "720P_60"
+    HD_30 = "720P_30"
+    HD_24 = "720P_24"
+    # SLOW MOTION. The camera captures ~240 fps and conforms it to a 30 fps file itself, so a
+    # 3-second recording produced a 23-second, 690-frame 640x480 clip - about 8x slow motion,
+    # verified with ffprobe. The YI M1 officially has no slow-motion mode at all; this was
+    # sitting in the firmware the whole time.
+    VGA_240 = "VGA_240"
+    # DELIBERATELY ABSENT - do not "restore" these: "2880_24" and "1920_24" are accepted by the
+    # command (HTTP 200) but the metadata never changes, i.e. the camera does NOT apply them.
+    # They are almost certainly leftovers of the multi-product Xacti ASDK platform, like
+    # StartMovieStream. "VGA" (without the frame rate) returns a plain 404.
+
+
+class RcOnOff(str, Enum):
+    """Shared value type for RCEisSwitchSet / RCVASwitchSet / RCVANoiseReduceSet.
+
+    UPPERCASE, and that matters: the strings live at 0x1540f0 and 0x1540f4 in the firmware and
+    the handlers compare against them directly. "On"/"Off" would 404 - which is exactly the trap
+    that kept these four commands filed as "dead" for years.
+    """
+    On = "ON"
+    Off = "OFF"
+
+
+class RcAudioVolume(str, Enum):
+    """Microphone level for RCVAVolSet. "50" is confirmed live (metadata echoed VAVol="50");
+    the rest of the scale is a reasonable 0-100 spread and is NOT individually verified."""
+    V0 = "0"
+    V25 = "25"
+    V50 = "50"
+    V75 = "75"
+    V100 = "100"

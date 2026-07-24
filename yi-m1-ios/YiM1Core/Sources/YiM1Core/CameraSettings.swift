@@ -26,6 +26,10 @@ public enum SettingKey: String, CaseIterable, Sendable {
     case whiteBalance = "WB"
     case colorMode = "ColorMode"
     case videoFormat = "VideoFormat"
+    case videoEis = "VideoEis"
+    case audioSwitch = "VASwitch"
+    case audioNoiseReduce = "VANR"
+    case audioVolume = "VAVol"
 }
 
 /// A settable camera value. `rawValue` is the exact API string; `command()` builds the
@@ -99,9 +103,40 @@ public enum VideoFormat: String, SettingValue {
     case fhd60 = "FHD_60"
     case fhd30 = "FHD_30"
     case fhd24 = "FHD_24"
+    // Confirmed live 2026-07-24: accepted AND echoed back by the live-view metadata.
+    case hd60 = "720P_60"
+    case hd30 = "720P_30"
+    case hd24 = "720P_24"
+    /// SLOW MOTION. The camera captures at ~240 fps and conforms it to a 30 fps file itself: a
+    /// 3-second recording produced a 23-second, 690-frame 640x480 clip - roughly 8x slow motion,
+    /// verified with ffprobe. The YI M1 officially has no slow-motion mode; this was in the
+    /// firmware all along.
+    case vga240 = "VGA_240"
+    // DELIBERATELY ABSENT - do not "restore" these: "2880_24" and "1920_24" return HTTP 200 but
+    // the metadata never changes, i.e. the camera does not apply them. Almost certainly leftovers
+    // of the multi-product Xacti ASDK platform, like StartMovieStream. Plain "VGA" 404s.
     public static let settingKey = SettingKey.videoFormat
     public static let commandName = "RCVideoFormatSet"
     public static let paramName = "Resolution"
+}
+
+/// Shared value type for the three video switches. UPPERCASE, and that matters: the strings live
+/// at 0x1540f0 / 0x1540f4 in the firmware and the handlers compare against them directly.
+/// "On"/"Off" would 404 - the exact trap that kept these commands filed as "dead" for years.
+public enum OnOff: String, SettingValue {
+    case on = "ON", off = "OFF"
+    public static let settingKey = SettingKey.videoEis
+    public static let commandName = "RCEisSwitchSet"
+    public static let paramName = "Operate"
+}
+
+/// Microphone level. "50" is confirmed live (metadata echoed VAVol="50"); the rest of the scale
+/// is a reasonable 0-100 spread and is NOT individually verified.
+public enum AudioVolume: String, SettingValue {
+    case v0 = "0", v25 = "25", v50 = "50", v75 = "75", v100 = "100"
+    public static let settingKey = SettingKey.audioVolume
+    public static let commandName = "RCVAVolSet"
+    public static let paramName = "Vol"
 }
 
 public enum TriggerFocusMode: String, Sendable {

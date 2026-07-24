@@ -199,3 +199,46 @@ class RcCmdSetVideoFormat(YiHttpCmd):
     def to_json(self) -> Dict[str, str]:
         return {"command":YiHttpCmdId.CMD_RC_SET_VIDEO_FORMAT.value,
                 "Resolution":self.__format.value}
+
+
+# ---------------------------------------------------------------------------------------------
+# Video/audio setters, all confirmed live on 2026-07-24. Every one of these was recorded in our
+# own docs as "returns 404, unreachable, handler exists but is not wired up" - and every one of
+# them was simply being sent the wrong parameter name. See 'fable research/rcvideoformatset-solved.md'.
+# ---------------------------------------------------------------------------------------------
+
+class RcCmdSetEis(YiHttpCmd):
+    """Electronic image stabilisation on/off. Key "Operate" (0x156528), values ON/OFF."""
+    def __init__(self, state : RcOnOff):
+        super().__init__()
+        self.__state = state
+
+    def to_json(self) -> Dict[str, str]:
+        return {"command":YiHttpCmdId.CMD_RC_SET_EIS_SWITCH.value, "Operate":self.__state.value}
+
+class RcCmdSetAudio(YiHttpCmd):
+    """Audio recording on/off. Same "Operate" key as EIS."""
+    def __init__(self, state : RcOnOff):
+        super().__init__()
+        self.__state = state
+
+    def to_json(self) -> Dict[str, str]:
+        return {"command":YiHttpCmdId.CMD_RC_SET_VA_SWITCH.value, "Operate":self.__state.value}
+
+class RcCmdSetAudioNoiseReduce(YiHttpCmd):
+    """Microphone noise reduction on/off. Same "Operate" key."""
+    def __init__(self, state : RcOnOff):
+        super().__init__()
+        self.__state = state
+
+    def to_json(self) -> Dict[str, str]:
+        return {"command":YiHttpCmdId.CMD_RC_SET_VA_NOISE_REDUCE.value, "Operate":self.__state.value}
+
+class RcCmdSetAudioVolume(YiHttpCmd):
+    """Microphone level. Key "Vol" (0x6b8421); metadata echoes it back as VAVol."""
+    def __init__(self, volume : "RcAudioVolume"):
+        super().__init__()
+        self.__volume = volume
+
+    def to_json(self) -> Dict[str, str]:
+        return {"command":YiHttpCmdId.CMD_RC_SET_VA_VOLUME.value, "Vol":self.__volume.value}
