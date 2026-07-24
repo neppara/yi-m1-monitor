@@ -14,9 +14,18 @@ yi-mirrorless-firmware-tools/
 *.dng
 *.DNG
 
-# Experiment output: 1500+ captured live-view frames. The prose findings in
-# 'fable research/*.md' are kept; the raw frame dumps are not.
-fable research/wifi-experiment-results/
+# Experiment output: captured live-view frames, probe logs, downloaded clips.
+# The prose findings in 'fable research/*.md' are kept; raw run output is not.
+# NOTE: no leading slash and matched at ANY depth on purpose - the probe scripts
+# write to 'yi-m1-remote-control/fable research/wifi-experiment-results/', which an
+# anchored 'fable research/...' pattern would NOT catch. These logs contain the
+# camera's per-session Wi-Fi password.
+wifi-experiment-results/
+
+# Worker-agent scratch space. Holds unpacked firmware sections derived from the
+# manufacturer's binary - MUST NOT be published. The task briefs and the prose
+# reports in agent-tasks/ itself are ours and may be published.
+agent-tasks/work/
 
 # ---------------------------------------------------------------------------
 # Build artifacts & environments

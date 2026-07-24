@@ -99,17 +99,16 @@ Core protocol logic lives in the `YiM1Core` Swift package and is unit-tested
 3. **Turn Bluetooth OFF during the session.** The phone shares one 2.4 GHz
    antenna between Bluetooth and Wi-Fi; leaving BT on measurably stutters the
    live view (see [findings](#protocol--findings)).
-4. Set the **video format on the camera itself before connecting** — it can't be
-   changed remotely (see limitations).
+4. The **video format can be set remotely** — including `24p`, which the camera's
+   own menu does not offer (see [Protocol & findings](#protocol--findings)).
 
 ---
 
 ## Limitations
 
 - Tested on one camera / firmware (`3.2-int`).
-- **Video format/resolution cannot be changed remotely** — the command exists in
-  firmware but the HTTP server returns 404, and the camera screen locks during a
-  Wi-Fi session. Set it on the camera beforehand.
+- Video is recorded as H.264 **Constrained Baseline** (no B-frames, no CABAC) at a
+  fixed bitrate — quality is capped by the firmware, not by our tools.
 - Recording is capped by a **4 GB file limit** (FAT32): ~7.5 min in 4K. The
   app's auto-restart works around it with a ~2 s gap between clips; the camera
   does **not** split files seamlessly.
@@ -123,8 +122,11 @@ Core protocol logic lives in the `YiM1Core` Swift package and is unit-tested
 
 The recovered protocol and the empirical camera behavior are documented in:
 
-- `fable research/` — the reverse-engineering write-ups (BLE handshake, HTTP
-  command table, UDP frame format, live-testing log, RAW-video feasibility).
+- `fable research/rcvideoformatset-solved.md` — **start here**: how the video-format
+  command was recovered from the firmware, the full parameter-key pool, and the
+  hardware verification.
+- `fable research/` — the rest of the reverse-engineering write-ups (BLE handshake,
+  HTTP command table, UDP frame format, live-testing log, RAW-video feasibility).
 - `yi-m1-remote-control/app/ARCHITECTURE.md` — macOS architecture + a bug-by-bug
   history ("don't step on these rakes again").
 - `yi-m1-ios/DEVELOPMENT_PLAN.md` — iOS design decisions and the multi-round
@@ -133,8 +135,18 @@ The recovered protocol and the empirical camera behavior are documented in:
 
 Highlights worth knowing before working with this camera:
 
-- Command failures are reported as **HTTP 200 with `{"code":<err>}` in the body**,
-  not via HTTP status.
+- **Remote video-format switching, including 24p.** `RCVideoFormatSet` takes the
+  parameter key **`Resolution`** (not `VideoFormat`) — recovered by disassembling
+  the handler at `0x0015641c`, then confirmed on hardware and verified with
+  `ffprobe` on the recorded files. Accepted values: `4K_30`, `4K_24`, `2K_30`,
+  `FHD_60`, `FHD_30`, `FHD_24`, `4K_30_LOW`. **`4K_24` and `FHD_24` are not
+  offered anywhere in the camera's own menus** and were never supported by the
+  official app. Full write-up: `fable research/rcvideoformatset-solved.md`.
+- Command failures are reported as **HTTP 200 with `{"code":<err>}` in the body**
+  — and success is `code: 200`, not `code: 0`. Transport status alone lies.
+- A command sent **without its required parameter returns the same 404** as a
+  command that does not exist. This is why the video setters looked "unrouted"
+  for so long — a negative result from live probing is not proof of impossibility.
 - The camera **throttles live view to ~7.5 fps while recording** (to feed the
   encoder) — this is normal, and is used as a signal to detect when it stops.
 - Measured sensor crops per video mode (2K = full 4:3 frame, FHD = 16:9 photo
