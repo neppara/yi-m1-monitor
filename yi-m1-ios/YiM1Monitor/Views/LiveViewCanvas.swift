@@ -228,7 +228,10 @@ struct LiveViewCanvas: View {
     private var recordingBarsCropApplies: Bool {
         guard isRecording, mode == .video, let videoFormat else { return false }
         let upper = videoFormat.uppercased()
-        return upper.hasPrefix("FHD") || upper.hasPrefix("4K")
+        // 720P added 2026-07-24: 16:9 like FHD (same measured crop), so it almost certainly
+        // bakes the same letterbox bars. Not directly measured - revisit if 720p live view
+        // looks wrong while recording. VGA_240 excluded: it is 4:3 (like 2K), no letterbox.
+        return upper.hasPrefix("FHD") || upper.hasPrefix("4K") || upper.hasPrefix("720P")
     }
 
     /// Crops the baked-in letterbox bars (centered 16:9 content region) off a frame when

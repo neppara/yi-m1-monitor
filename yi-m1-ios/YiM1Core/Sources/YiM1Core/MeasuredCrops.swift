@@ -27,6 +27,9 @@ public enum MeasuredCrops {
         ("2K", CropRect(0.0000, 0.0000, 1.0000, 1.0000)),  // 2048x1536, 4:3 - full sensor, just downscaled
         ("FHD", CropRect(0.0004, 0.1268, 0.9961, 0.7472)), // 1920x1080, 16:9 - same geometry as the 16:9 photo crop
         ("4K", CropRect(0.1294, 0.2230, 0.7409, 0.5558)),  // 3840x2160, 16:9 - real ~74%x56% crop, near-native readout
+        // Confirmed on-camera 2026-07-24: 720p shares FHD's crop, VGA_240 (slow-mo) shares 2K's.
+        ("720P", CropRect(0.0004, 0.1268, 0.9961, 0.7472)), // 1280x720 16:9 - same crop as FHD
+        ("VGA", CropRect(0.0000, 0.0000, 1.0000, 1.0000)),  // 640x480 4:3 - same as 2K (full sensor, downscaled)
     ]
 
     /// Keyed by the EXACT "ImageAspect" value (this setting genuinely changes live via

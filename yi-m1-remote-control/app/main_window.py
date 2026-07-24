@@ -94,6 +94,9 @@ MEASURED_VIDEO_CROPS = {
     "2K": (0.0000, 0.0000, 1.0000, 1.0000),   # 2048x1536, 4:3 - full sensor, just downscaled
     "FHD": (0.0004, 0.1268, 0.9961, 0.7472),  # 1920x1080, 16:9 - same geometry as the 16:9 photo aspect crop
     "4K": (0.1294, 0.2230, 0.7409, 0.5558),   # 3840x2160, 16:9 - real ~74%x56% crop, near-native pixel readout
+    # Confirmed on-camera 2026-07-24: 720p shares FHD's crop, VGA_240 (slow-mo) shares 2K's.
+    "720P": (0.0004, 0.1268, 0.9961, 0.7472),  # 1280x720, 16:9 - same crop as FHD
+    "VGA": (0.0000, 0.0000, 1.0000, 1.0000),   # 640x480, 4:3 - same as 2K (full sensor, downscaled)
 }
 MEASURED_PHOTO_CROPS = {
     "4:3": (0.0000, 0.0000, 1.0000, 1.0000),
@@ -399,8 +402,12 @@ class LiveViewWidget(QWidget):
         bars included was 4:3, not the real 16:9 capture area. 2K is deliberately excluded (its
         measured crop is the full sensor frame; whether its stream is letterboxed is
         unverified)."""
+        # 720P added 2026-07-24: it is 16:9 like FHD (same measured crop), so it almost
+        # certainly bakes the same letterbox bars during recording. Not directly measured -
+        # if 720p live view looks wrong while recording, this is the line to revisit.
+        # VGA_240 stays excluded: it is 4:3 (like 2K), no 16:9 letterbox.
         if not (self.is_recording and self.current_video_format
-                and self.current_video_format.upper().startswith(("FHD", "4K"))):
+                and self.current_video_format.upper().startswith(("FHD", "4K", "720P"))):
             return image
         width = image.width()
         height = image.height()
