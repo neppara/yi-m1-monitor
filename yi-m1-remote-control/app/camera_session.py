@@ -181,6 +181,15 @@ class CameraSession(QThread):
         self._wifi_device: Optional[str] = None
         self._is_recording = False
         self._metadata_parse_failed_once = False
+        # Keep-latest backpressure for live-view frames (2026-07-24 optimisation pass).
+        # frameReady is a queued cross-thread signal: if the GUI thread falls behind (JPEG
+        # decode + peaking + repaint), Qt keeps queueing frames and the displayed image drifts
+        # further and further behind reality, while memory grows with the backlog. The iOS app
+        # hit exactly this and fixed it with AsyncStream's .bufferingNewest(1); macOS never got
+        # the equivalent. Now a new frame is only emitted once the UI has consumed the previous
+        # one - a late frame is dropped instead of queued, which is what a live view wants.
+        self._frame_pending = False
+        self._frames_dropped_backpressure = 0
         self._last_record_command_at = 0.0
         # User-configured fallback for the previous-Wi-Fi-network capture (M5, 2026-07-12) -
         # only consulted when the auto-detects (system_profiler, then networksetup) both fail.
@@ -221,6 +230,14 @@ class CameraSession(QThread):
 
     def request_disconnect(self):
         self._requests.put(("disconnect",))
+
+    def notify_frame_consumed(self):
+        """Called by the UI once it has finished displaying a frame - see _frame_pending.
+
+        A plain bool assignment is enough for cross-thread use here: CPython makes it atomic,
+        and the worst case of a race is one extra dropped or one extra queued frame, which is
+        invisible in a 30fps preview."""
+        self._frame_pending = False
 
     def request_command(self, command_dict: dict):
         self._requests.put(("send", command_dict))
@@ -1194,6 +1211,11 @@ class CameraSession(QThread):
                     self._last_video_format = video_format
                 self.liveMetadataUpdated.emit(metadata)
 
-            img = QImage.fromData(jpeg_bytes, "JPG")
-            if not img.isNull():
-                self.frameReady.emit(img)
+            if self._frame_pending:
+                # UI still busy with the previous frame - drop this one rather than queue it.
+                self._frames_dropped_backpressure += 1
+            else:
+                img = QImage.fromData(jpeg_bytes, "JPG")
+                if not img.isNull():
+                    self._frame_pending = True
+                    self.frameReady.emit(img)

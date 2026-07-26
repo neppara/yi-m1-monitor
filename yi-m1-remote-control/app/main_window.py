@@ -954,6 +954,7 @@ class MainWindow(QMainWindow):
         # pushes settings on connect (verified 2026-07-24); this closes the one window where a
         # user click could do it by accident.
         self._metadata_synced = False
+        self._last_peaking_at = 0.0
 
         central = QWidget()
         root = QVBoxLayout(central)
@@ -1549,14 +1550,27 @@ class MainWindow(QMainWindow):
     def _on_connected(self):
         self._connected = True
         self._metadata_synced = False
+        self._last_peaking_at = 0.0
         self._set_controls_enabled(True)
         self._set_status("Connected")
         self._refresh_connection_ui()
 
+    # Peaking runs on the GUI thread and costs ~2ms per frame (measured, 800x600). Recomputing
+    # it 30x/s buys nothing: it is a focus aid, and the eye cannot follow edge highlights faster
+    # than this. Capping it halves the peaking cost while looking identical.
+    PEAKING_MAX_FPS = 15.0
+
     def _on_frame(self, image: QImage):
         self.live_view.set_image(image)
         if _PEAKING_AVAILABLE and self.peaking_btn.isChecked() and self._connected:
-            self.live_view.set_peaking_overlay(self._compute_peaking(image))
+            now = time.monotonic()
+            if now - self._last_peaking_at >= 1.0 / self.PEAKING_MAX_FPS:
+                self._last_peaking_at = now
+                self.live_view.set_peaking_overlay(self._compute_peaking(image))
+        # Release the session's keep-latest gate (see CameraSession._frame_pending): until this
+        # runs, the receiver drops incoming frames instead of queueing them behind a busy UI.
+        if self.session is not None:
+            self.session.notify_frame_consumed()
 
     def _on_status(self, data: dict):
         battery = data.get("batteryLevel", "?")
