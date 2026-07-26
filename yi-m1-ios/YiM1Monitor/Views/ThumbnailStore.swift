@@ -25,10 +25,6 @@ final class ThumbnailStore: ObservableObject {
     /// request that's already been superseded (the camera only handles one request at a time, so
     /// a burst of stale requests would just clog the queue instead of silently failing).
     func load<Session: CameraSessionProtocol>(_ file: CameraFile, session: Session) async {
-        // The camera has no thumbnail for video: asking for one makes it ignore the quality
-        // parameter and stream the entire clip, which tore down the whole session on macOS
-        // before this was fixed (2026-07-24). Skip video entirely - the row shows its icon.
-        guard !file.isVideo else { return }
         guard images[file.path] == nil, !failedPaths.contains(file.path), !inFlightPaths.contains(file.path) else { return }
         guard !Task.isCancelled else { return }
 

@@ -78,10 +78,21 @@ struct SettingsStrip<Session: CameraSessionProtocol>: View {
                 Text(chipTitles[key] ?? key.rawValue)
                     .font(.system(size: AppFont.caption))
                     .foregroundStyle(isExpanded ? AppColor.accent : AppColor.text3)
-                Text(displayValue(for: key))
-                    .font(.system(size: AppFont.value, weight: .medium))
-                    .foregroundStyle(isExpanded ? AppColor.accent : AppColor.text)
-                    .lineLimit(1)
+                // Sized to the WIDEST value this setting can ever show, so the chip keeps a
+                // constant width (2026-07-26). Without this the chip resized as its value
+                // changed - EV was the obvious case ("0.0" vs "-5.0") - and every resize
+                // shifted the whole strip sideways under the user's finger. The hidden Text
+                // is the spacer; ZStack takes the larger of the two.
+                ZStack(alignment: .leading) {
+                    Text(widestValueLabel(for: key))
+                        .font(.system(size: AppFont.value, weight: .medium))
+                        .lineLimit(1)
+                        .hidden()
+                    Text(displayValue(for: key))
+                        .font(.system(size: AppFont.value, weight: .medium))
+                        .foregroundStyle(isExpanded ? AppColor.accent : AppColor.text)
+                        .lineLimit(1)
+                }
             }
             .padding(.horizontal, AppSpace.md)
             .padding(.vertical, AppSpace.sm)
@@ -91,6 +102,17 @@ struct SettingsStrip<Session: CameraSessionProtocol>: View {
             .clipShape(RoundedRectangle(cornerRadius: AppRadius.sm))
         }
         .buttonStyle(.plain)
+    }
+
+    /// Longest label this setting can display - used as an invisible width spacer so the chip
+    /// never resizes. Character count is a good enough proxy for width here: the values are
+    /// short, same-font strings, and being a pixel or two generous costs nothing.
+    private func widestValueLabel(for key: SettingKey) -> String {
+        let longest = SettingCatalog.options(for: key)
+            .map(\.displayLabel)
+            .max(by: { $0.count < $1.count }) ?? ""
+        // "—" is shown before the camera's values arrive; never size below that.
+        return longest.count >= 1 ? longest : "—"
     }
 
     private func displayValue(for key: SettingKey) -> String {

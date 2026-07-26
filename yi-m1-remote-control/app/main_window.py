@@ -648,12 +648,16 @@ class LiveViewWidget(QWidget):
 
 
 def _is_video_path(path: str) -> bool:
-    """Video files have no usable thumbnail on this camera.
+    """True for clips, which have no MidThumb-quality PREVIEW on this camera.
 
-    Asking for a thumbnail/MidThumb of a video makes the camera ignore the quality parameter
-    and stream the entire clip instead, which used to tear down the whole session (see
-    CameraSession._do_fetch_image). Matching on the extension rather than GetFileList's
-    "filetype" field because the extension is present in every response shape we handle.
+    Nuance worth keeping straight (corrected 2026-07-26): the small row thumbnail
+    ("Thumbnail" quality) works fine for video and always did. It is the larger MidThumb
+    preview that the camera cannot produce - asked for one it ignores the quality parameter
+    and streams the entire clip, which used to tear the session down (see
+    CameraSession._do_fetch_image). So this gate applies to previews only, not thumbnails.
+
+    Matching on the extension rather than GetFileList's "filetype" field because the extension
+    is present in every response shape we handle.
     """
     return str(path).upper().endswith((".MP4", ".MOV", ".AVI"))
 
@@ -811,9 +815,8 @@ class FileBrowserDialog(QDialog):
             # whole clip when asked for a thumbnail). Download it instead.
             QMessageBox.information(
                 self, "No preview for video",
-                "This camera cannot produce a thumbnail for video files - asking for one makes "
-                "it stream the entire clip.\n\nUse Download to save the file and play it "
-                "locally.")
+                "The camera cannot render a still for a clip.\n\n"
+                "Download it to play it locally.")
             return
         self.session.request_file_preview(path)
 
@@ -900,8 +903,9 @@ class FileBrowserDialog(QDialog):
         # flowing), and _on_thumb_ready fills the icons in as they land. Cached ones apply
         # immediately and aren't re-fetched.
         for path, item in self._items_by_path.items():
-            if _is_video_path(path):
-                continue          # no thumbnail exists for video - see _is_video_path
+            # Video DOES get a row thumbnail: the small "Thumbnail" quality works for it (it
+            # always did). Only the larger MidThumb preview does not - see _is_video_path.
+            # Blocking both on 2026-07-24 was an overcorrection.
             cached = self._thumb_cache.get(path)
             if cached is not None:
                 item.setIcon(cached)
@@ -1189,8 +1193,17 @@ class MainWindow(QMainWindow):
         cap = QLabel(label)
         cap.setProperty("tier", "muted")
         combo = QComboBox()
-        combo.addItems([_display_label(metadata_key, e.value) for e in enum_cls])
-        combo.setMinimumWidth(96)
+        labels = [_display_label(metadata_key, e.value) for e in enum_cls]
+        combo.addItems(labels)
+        # FIXED width, sized to the WIDEST value this setting can ever show (2026-07-26).
+        # setMinimumWidth alone only set a floor, so a chip grew and shrank as its value
+        # changed - EV was the obvious case ("0.0" is 3 characters, "-5.0" is 4), and every
+        # resize shoved the whole rest of the grid sideways while the user was aiming at it.
+        # Measuring the longest label up front keeps every chip a constant size for the whole
+        # session, so the strip never reflows.
+        metrics = combo.fontMetrics()
+        widest = max((metrics.horizontalAdvance(t) for t in labels), default=0)
+        combo.setFixedWidth(max(96, widest + 44))  # + room for the dropdown arrow and padding
         # activated (not currentIndexChanged) fires only on real user interaction, so metadata
         # syncing via setCurrentIndex can never re-trigger a command.
         combo.activated.connect(

@@ -68,9 +68,17 @@ struct FileDetailView<Session: CameraSessionProtocol>: View {
                     Image(systemName: file.isVideo ? AppIcon.video : AppIcon.camera)
                         .font(.system(size: 32))
                         .foregroundStyle(AppColor.text3)
-                    Text("No preview available")
+                    Text(file.isVideo ? "No preview for video" : "No preview available")
                         .font(.system(size: AppFont.caption))
                         .foregroundStyle(AppColor.text3)
+                    if file.isVideo {
+                        // Says why, so it does not read as a bug. The camera genuinely cannot
+                        // render a still for a clip - see FileDetailView.loadPreview.
+                        Text("The camera cannot render one.\nDownload the clip to view it.")
+                            .font(.system(size: AppFont.caption))
+                            .foregroundStyle(AppColor.text3)
+                            .multilineTextAlignment(.center)
+                    }
                 }
             } else {
                 ProgressView().tint(AppColor.accent)
