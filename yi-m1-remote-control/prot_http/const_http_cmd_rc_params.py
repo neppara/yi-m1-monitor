@@ -17,7 +17,10 @@ class RcExposureMode(str, Enum):
     AperturePriority = "A"
     ShutterPriority = "S"
     Manual = "M"
-    MasterGuide = "C"
+    # "Scene", not "C". The inherited map had C/"MasterGuide", but the camera's own value table
+    # (.data 0xc09c2c68) lists exactly: Auto, P, A, S, M, Scene - there is no C. "Scene" was
+    # additionally accepted by a real camera (2026-07-24), "C" would just be rejected.
+    Scene = "Scene"
 
 class RcFocusMode(str, Enum):
     ContrastAutofocus = "C-AF"

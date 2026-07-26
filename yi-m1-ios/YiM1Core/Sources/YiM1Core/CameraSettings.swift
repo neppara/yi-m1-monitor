@@ -56,7 +56,10 @@ public extension SettingValue {
 // MARK: - RCSwitchDialMode {DialMode} (note: metadata key "ExposureMode" != param "DialMode")
 
 public enum ExposureMode: String, SettingValue {
-    case auto = "Auto", program = "P", aperturePriority = "A", shutterPriority = "S", manual = "M", masterGuide = "C"
+    // "Scene", not "C". The inherited map had C/"MasterGuide", but the camera's own value table
+    // (.data 0xc09c2c68) lists exactly: Auto, P, A, S, M, Scene - there is no C. "Scene" was
+    // additionally accepted by a real camera (2026-07-24), "C" would just be rejected.
+    case auto = "Auto", program = "P", aperturePriority = "A", shutterPriority = "S", manual = "M", scene = "Scene"
     public static let settingKey = SettingKey.exposureMode
     public static let commandName = "RCSwitchDialMode"
     public static let paramName = "DialMode"

@@ -134,7 +134,7 @@ SETTINGS_COLUMNS = 7
 # formatter in _display_label.
 _PRETTY_LABELS = {
     "ExposureMode": {"Auto": "Auto", "P": "Program", "A": "Aperture", "S": "Shutter",
-                     "M": "Manual", "C": "Master"},
+                     "M": "Manual", "Scene": "Scene"},
     "MeteringMode": {"Multi": "Multi", "Spot": "Spot", "CenterWeighted": "Center"},
     "FocusMode": {"C-AF": "C-AF", "S-AF": "S-AF", "MF": "Manual"},
     "FileFormat": {"RAW": "RAW", "JPG-S": "JPEG S", "JPG-M": "JPEG M", "JPG-L": "JPEG L",
@@ -1123,23 +1123,23 @@ class MainWindow(QMainWindow):
 
     def _build_settings_strip(self) -> QWidget:
         setting_defs = {
-            "ExposureMode": ("Mode", RcExposureMode, RcCmdSetCameraMode),
+            "ExposureMode": ("Exposure", RcExposureMode, RcCmdSetCameraMode),
             "MeteringMode": ("Metering", RcMeteringMode, RcCmdSetMeteringMode),
             "FocusMode": ("Focus", RcFocusMode, RcCmdSetFocusingMode),
-            "ImageQuality": ("Quality", RcImageQuality, RcCmdSetImageQuality),
+            "ImageQuality": ("Resolution", RcImageQuality, RcCmdSetImageQuality),
             "ImageAspect": ("Aspect", RcImageAspect, RcCmdSetImageAspect),
-            "FileFormat": ("Format", RcFileFormat, RcCmdSetImageFormat),
-            "DriveMode": ("Drive", RcDriveMode, RcCmdSetDriveMode),
+            "FileFormat": ("File type", RcFileFormat, RcCmdSetImageFormat),
+            "DriveMode": ("Drive mode", RcDriveMode, RcCmdSetDriveMode),
             "Fnumber": ("Aperture", RcFStop, RcCmdSetFStop),
             "ShutterSpeed": ("Shutter", RcShutterSpeed, RcCmdSetShutterSpeed),
             "EV": ("EV", RcEvOffset, RcCmdSetExposureValueOffset),
             "ISOSetting": ("ISO", RcIso, RcCmdSetIso),
             "WB": ("WB", RcWhiteBalance, RcCmdSetWhiteBalanceMode),
             "ColorMode": ("Color", RcColorStyle, RcCmdSetColorStyle),
-            "VideoFormat": ("Format", RcVideoFormat, RcCmdSetVideoFormat),
-            "VideoEis": ("Stabilise", RcOnOff, RcCmdSetEis),
+            "VideoFormat": ("Resolution", RcVideoFormat, RcCmdSetVideoFormat),
+            "VideoEis": ("Stabilisation", RcOnOff, RcCmdSetEis),
             "VASwitch": ("Audio", RcOnOff, RcCmdSetAudio),
-            "VANR": ("Mic NR", RcOnOff, RcCmdSetAudioNoiseReduce),
+            "VANR": ("Mic denoise", RcOnOff, RcCmdSetAudioNoiseReduce),
             "VAVol": ("Mic level", RcAudioVolume, RcCmdSetAudioVolume),
         }
 

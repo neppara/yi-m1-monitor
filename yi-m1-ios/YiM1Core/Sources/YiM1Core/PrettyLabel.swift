@@ -8,7 +8,7 @@ import Foundation
 public enum PrettyLabel {
     private static let explicitMaps: [SettingKey: [String: String]] = [
         .exposureMode: ["Auto": "Auto", "P": "Program", "A": "Aperture", "S": "Shutter",
-                        "M": "Manual", "C": "Master"],
+                        "M": "Manual", "Scene": "Scene"],
         .meteringMode: ["Multi": "Multi", "Spot": "Spot", "CenterWeighted": "Center"],
         .focusMode: ["C-AF": "C-AF", "S-AF": "S-AF", "MF": "Manual"],
         .fileFormat: ["RAW": "RAW", "JPG-S": "JPEG S", "JPG-M": "JPEG M", "JPG-L": "JPEG L",

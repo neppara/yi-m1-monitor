@@ -127,3 +127,24 @@ final class RevivedVideoCommandTests: XCTestCase {
         }
     }
 }
+
+/// The dial-mode list came from the inherited bullbin map and carried a value the camera does
+/// not have. Pinned here so it cannot creep back.
+final class ExposureModeValueTests: XCTestCase {
+
+    /// The camera's own value table (.data 0xc09c2c68) reads exactly: Auto, P, A, S, M, Scene.
+    func testDialModeMatchesTheCameraValueTable() {
+        XCTAssertEqual(Set(ExposureMode.allCases.map(\.rawValue)),
+                       ["Auto", "P", "A", "S", "M", "Scene"])
+    }
+
+    func testTheInventedCValueIsGone() {
+        XCTAssertFalse(ExposureMode.allCases.map(\.rawValue).contains("C"),
+                       "\"C\" is not in the camera's value table - it would be rejected.")
+    }
+
+    func testSceneBuildsTheRequestTheCameraAccepted() {
+        XCTAssertEqual(SettingCatalog.command(for: .exposureMode, rawValue: "Scene"),
+                       ["command": "RCSwitchDialMode", "DialMode": "Scene"])
+    }
+}

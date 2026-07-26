@@ -10,11 +10,19 @@
 import SwiftUI
 import YiM1Core
 
+/// Chip captions. Deliberately the words a photographer already uses - ISO, Aperture, Shutter,
+/// EV and WB are left exactly as they are, because renaming standard terms only makes them
+/// harder to find. What was renamed (2026-07-24) is the engineering-flavoured leftovers:
+/// "Mode" was too vague, "Quality" actually meant megapixels, "Drive" was an abbreviation, and
+/// "Format" was used for BOTH the photo file type and the video resolution.
 private let chipTitles: [SettingKey: String] = [
-    .exposureMode: "Mode", .meteringMode: "Metering", .focusMode: "Focus",
-    .imageQuality: "Quality", .imageAspect: "Aspect", .fileFormat: "Format", .driveMode: "Drive",
+    .exposureMode: "Exposure", .meteringMode: "Metering", .focusMode: "Focus",
+    .imageQuality: "Resolution", .imageAspect: "Aspect", .fileFormat: "File type",
+    .driveMode: "Drive mode",
     .fNumber: "Aperture", .shutterSpeed: "Shutter", .ev: "EV", .iso: "ISO",
     .whiteBalance: "WB", .colorMode: "Color",
+    .videoFormat: "Resolution", .videoEis: "Stabilisation", .audioSwitch: "Audio",
+    .audioNoiseReduce: "Mic denoise", .audioVolume: "Mic level",
 ]
 
 struct SettingsStrip<Session: CameraSessionProtocol>: View {
