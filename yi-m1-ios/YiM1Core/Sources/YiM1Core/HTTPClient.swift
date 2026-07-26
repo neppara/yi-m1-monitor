@@ -156,6 +156,11 @@ public actor HTTPClient {
     /// is correct but not maximally fast for large files. If 32MB downloads feel slow on-device,
     /// switching to URLSessionDownloadTask with delegate-based progress is the known fix -
     /// not done here to keep this dependency-free and simple for v1.
+    /// Hard ceiling for downloads kept in memory. A thumbnail/preview is ~228 KB; anything
+    /// approaching this is the camera streaming a whole file, which must never be buffered on a
+    /// phone. Use `download(_:to:...)` for real files - it streams to disk instead.
+    public static let maxInMemoryDownloadBytes = 32 * 1024 * 1024
+
     public func download(
         _ command: [String: Any],
         timeout: TimeInterval = 30.0,
@@ -169,8 +174,41 @@ public actor HTTPClient {
         // ticking until the request is actually sent.)
         let result: Result<Data, Error> = await serialized {
             do {
-                return .success(try await Self.performDownload(session: session, url: url, timeout: timeout, onProgress: onProgress))
+                return .success(try await Self.performDownload(
+                    session: session, url: url, timeout: timeout,
+                    destination: nil, maxBytes: Self.maxInMemoryDownloadBytes,
+                    onProgress: onProgress))
             } catch {
+                return .failure(error)
+            }
+        }
+        return try result.get()
+    }
+
+    /// Streams a response straight to `destination` on disk.
+    ///
+    /// Added 2026-07-24 after review: the in-memory path accumulated the WHOLE file in a `Data`
+    /// (and even called `reserveCapacity(Content-Length)` up front). A clip off this camera runs
+    /// up to the 4 GB FAT32 ceiling, so downloading one on an iPhone reserved gigabytes and got
+    /// the app killed by jetsam long before it finished. Bytes now go to a file handle in 64 KB
+    /// chunks and peak memory stays flat regardless of file size.
+    public func download(
+        _ command: [String: Any],
+        to destination: URL,
+        timeout: TimeInterval = 300.0,
+        onProgress: @escaping @Sendable (Int, Int) -> Void
+    ) async throws {
+        guard let url = buildURL(command) else { throw HTTPClientError.invalidURL }
+        let session = self.session
+        let result: Result<Void, Error> = await serialized {
+            do {
+                _ = try await Self.performDownload(
+                    session: session, url: url, timeout: timeout,
+                    destination: destination, maxBytes: nil, onProgress: onProgress)
+                return .success(())
+            } catch {
+                // Never leave a truncated file behind: it looks valid in Files and fails to play.
+                try? FileManager.default.removeItem(at: destination)
                 return .failure(error)
             }
         }
@@ -181,6 +219,8 @@ public actor HTTPClient {
         session: URLSession,
         url: URL,
         timeout: TimeInterval,
+        destination: URL?,
+        maxBytes: Int?,
         onProgress: @escaping @Sendable (Int, Int) -> Void
     ) async throws -> Data {
         var request = URLRequest(url: url, timeoutInterval: timeout)
@@ -197,18 +237,54 @@ public actor HTTPClient {
             return length
         }()
 
-        var data = Data()
-        if total > 0 { data.reserveCapacity(total) }
-        var sinceLastReport = 0
+        // Chunked, not byte-by-byte: `append` per byte over an AsyncSequence means one
+        // iteration per byte - billions of them for a multi-GB clip. 64 KB chunks keep both the
+        // allocation count and the progress-callback rate sane.
+        let chunkSize = 64 * 1024
+        var handle: FileHandle?
+        if let destination {
+            FileManager.default.createFile(atPath: destination.path, contents: nil)
+            handle = try FileHandle(forWritingTo: destination)
+        }
+        defer { try? handle?.close() }
+
+        var data = Data()            // stays empty when streaming to disk
+        var chunk = Data()
+        chunk.reserveCapacity(chunkSize)
+        var received = 0
+        var lastReported = 0
+
+        func flush() throws {
+            guard !chunk.isEmpty else { return }
+            if let handle {
+                try handle.write(contentsOf: chunk)
+            } else {
+                data.append(chunk)
+            }
+            chunk.removeAll(keepingCapacity: true)
+        }
+
         for try await byte in asyncBytes {
-            data.append(byte)
-            sinceLastReport += 1
-            if sinceLastReport >= 8192 {
-                onProgress(data.count, total)
-                sinceLastReport = 0
+            chunk.append(byte)
+            received += 1
+            if chunk.count >= chunkSize {
+                try flush()
+            }
+            // Only in-memory downloads are capped; a disk-bound one may legitimately be huge.
+            if let maxBytes, received > maxBytes {
+                throw NSError(domain: "YiM1Core.HTTPClient", code: -2, userInfo: [
+                    NSLocalizedDescriptionKey:
+                        "Response exceeded \(maxBytes) bytes - the camera is streaming a whole "
+                        + "file rather than a preview (expected for video). Aborted.",
+                ])
+            }
+            if received - lastReported >= chunkSize {
+                onProgress(received, total)
+                lastReported = received
             }
         }
-        onProgress(data.count, total)
+        try flush()
+        onProgress(received, total)
 
         guard httpResponse.statusCode == 200 else {
             throw NSError(domain: "YiM1Core.HTTPClient", code: httpResponse.statusCode, userInfo: [

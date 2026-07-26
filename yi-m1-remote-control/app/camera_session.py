@@ -7,6 +7,7 @@ signals (thread-safe) and a request queue (for outgoing commands).
 """
 import io
 import json
+import os
 import queue
 import socket
 import subprocess
@@ -514,7 +515,9 @@ class CameraSession(QThread):
 
         if response.status != 200:
             preview = response.read(200)
-            response.release_conn()
+            # Only 200 bytes of the error body were read - drain the rest (see
+            # _drain_and_release) instead of handing a half-read socket back.
+            self._drain_and_release(response)
             preview_text = preview.decode("utf-8", errors="replace")
             log("_do_download: status=%s body_preview=%r" % (response.status, preview_text))
             self.fileDownloaded.emit(save_path, False, "HTTP %s: %s" % (response.status, preview_text))
@@ -533,10 +536,20 @@ class CameraSession(QThread):
                     bytes_written += len(chunk)
                     self.fileDownloadProgress.emit(bytes_written, total)
         except Exception as e:
-            response.release_conn()
+            # Review finding 2026-07-24: this used to release_conn() a HALF-READ response, the
+            # same mistake that made video previews kill the session (bug #18). If the write
+            # fails partway - disk full, permissions - the camera is still sending; handing that
+            # socket back to the pool wedges the next request. Drain first, then release.
+            self._drain_and_release(response)
+            # A partially written file is worse than none: it looks valid in Finder and will
+            # fail to open. Remove it so the failure is visible where it happened.
+            try:
+                os.remove(save_path)
+            except OSError:
+                pass
             self.fileDownloaded.emit(save_path, False, repr(e))
             return
-        response.release_conn()
+        self._drain_and_release(response)
 
         log("_do_download: wrote %d bytes to %s" % (bytes_written, save_path))
         self.fileDownloaded.emit(save_path, True, "%d bytes" % bytes_written)
@@ -599,7 +612,7 @@ class CameraSession(QThread):
             return
 
         if response.status != 200:
-            response.release_conn()
+            self._drain_and_release(response)
             self.photoReviewFailed.emit("GetFile failed (status=%s)" % response.status)
             return
 
@@ -617,7 +630,9 @@ class CameraSession(QThread):
             self.photoReviewFailed.emit("Download interrupted: %r" % (e,))
             return
         finally:
-            response.release_conn()
+            # Reached on the interrupted-read path too, where the camera is still writing -
+            # drain before releasing or the next request inherits a wedged socket.
+            self._drain_and_release(response)
 
         if total > 0 and len(data) != total:
             log("_download_preview_with_progress: WARNING got %d bytes but Content-Length said "
@@ -641,6 +656,25 @@ class CameraSession(QThread):
     # ~32 MB originals. Anything past this is the camera ignoring the quality parameter and
     # streaming the whole file, which is exactly what happens for VIDEO (see _do_fetch_image).
     MAX_PREVIEW_BYTES = 4 * 1024 * 1024
+
+    @staticmethod
+    def _drain_and_release(response):
+        """Finish a streamed response cleanly before letting go of the socket.
+
+        The camera serves one client at a time. Releasing a half-read response hands a socket
+        back to the pool while the camera is still writing into it, which wedges every request
+        that follows - that is exactly how a video preview used to take the whole session down
+        (bug #18). Draining costs a moment; not draining costs the connection."""
+        if response is None:
+            return
+        try:
+            response.drain_conn()
+        except Exception:
+            pass
+        try:
+            response.release_conn()
+        except Exception:
+            pass
 
     def _do_fetch_image(self, path: str, quality, signal):
         """Shared in-memory image fetch for thumbnails/previews (2026-07-19). Failures are
@@ -689,17 +723,7 @@ class CameraSession(QThread):
         except Exception as e:
             log("_do_fetch_image: %s (%s) failed: %r" % (path, quality, e))
         finally:
-            if response is not None:
-                # Let the camera finish its side before the socket goes away; a half-read
-                # response is what wedged it previously.
-                try:
-                    response.drain_conn()
-                except Exception:
-                    pass
-                try:
-                    response.release_conn()
-                except Exception:
-                    pass
+            self._drain_and_release(response)
 
     def _do_toggle_recording(self):
         if time.time() - self._last_record_command_at < self.RECORD_COMMAND_COOLDOWN:
@@ -1029,7 +1053,12 @@ class CameraSession(QThread):
             now = time.time()
             if now - last_status_poll > 5.0:
                 status, body = self._send({"command": "GetCameraStatus"})
-                if status == 200:
+                # Review finding 2026-07-24: this used to test `status == 200`, so a camera that
+                # answered HTTP 200 with an error body (`{"code":<err>}`) counted as healthy and
+                # the consecutive-failure counter reset. The camera-vanished detector could then
+                # never fire for a camera that is reachable but wedged - precisely the state a
+                # half-read response leaves it in (bug #18). is_camera_success checks the body.
+                if is_camera_success(status, body):
                     consecutive_status_failures = 0
                     try:
                         self.statusUpdated.emit(json.loads(body).get("data", {}))

@@ -759,10 +759,12 @@ public final class CameraSession: ObservableObject, CameraSessionProtocol {
     }
 
     public func downloadFile(_ path: String, quality: FileQuality, to url: URL, onProgress: @escaping (Int, Int) -> Void) async throws {
-        let data = try await httpClient.download(Commands.getFile(path: path, quality: quality)) { received, total in
+        // Streams straight to disk (2026-07-24). The previous version buffered the entire file
+        // in memory and then wrote it in one go, which for a multi-GB clip off this camera got
+        // the app jetsam-killed before the write ever happened.
+        try await httpClient.download(Commands.getFile(path: path, quality: quality), to: url) { received, total in
             onProgress(received, total)
         }
-        try data.write(to: url)
     }
 
     public func fetchFileData(_ path: String, quality: FileQuality) async throws -> Data {
