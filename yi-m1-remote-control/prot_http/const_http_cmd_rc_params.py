@@ -325,9 +325,16 @@ class RcOnOff(str, Enum):
 
 
 class RcAudioVolume(str, Enum):
-    """Microphone level for RCVAVolSet. "50" is confirmed live (metadata echoed VAVol="50");
-    the rest of the scale is a reasonable 0-100 spread and is NOT individually verified."""
-    V0 = "0"
+    """Microphone level for RCVAVolSet - a PERCENTAGE, 1..100.
+
+    Scale measured on the camera 2026-07-26 (probe_mic_volume_scale.py): every value from 1 to
+    100 is echoed back verbatim in the VAVol metadata field, so it really is percent and not the
+    small level scale it first looked like. "0" is the one value the camera REJECTS - it keeps
+    the previous setting. Use the separate Audio on/off switch (RCVASwitchSet) to mute.
+
+    Worth knowing: the camera's own default sat at 2 (i.e. 2%), which is effectively silent and
+    is what produced a "video recorded with no sound" report. Anything below ~25 is very quiet."""
+    V10 = "10"
     V25 = "25"
     V50 = "50"
     V75 = "75"

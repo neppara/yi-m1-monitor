@@ -134,10 +134,17 @@ public enum OnOff: String, SettingValue {
     public static let paramName = "Operate"
 }
 
-/// Microphone level. "50" is confirmed live (metadata echoed VAVol="50"); the rest of the scale
-/// is a reasonable 0-100 spread and is NOT individually verified.
+/// Microphone level for RCVAVolSet - a PERCENTAGE, 1...100.
+///
+/// Scale measured on the camera 2026-07-26 (probe_mic_volume_scale.py): every value from 1 to
+/// 100 comes back verbatim in the VAVol metadata field, so it really is percent and not the
+/// small level scale it first appeared to be. "0" is the one value the camera REJECTS — it
+/// keeps the previous setting; use the separate Audio on/off switch to mute.
+///
+/// Worth knowing: the camera's own default sat at 2 (2%), effectively silent, which is what
+/// produced a "video recorded with no sound" report. Anything under ~25 is very quiet.
 public enum AudioVolume: String, SettingValue {
-    case v0 = "0", v25 = "25", v50 = "50", v75 = "75", v100 = "100"
+    case v10 = "10", v25 = "25", v50 = "50", v75 = "75", v100 = "100"
     public static let settingKey = SettingKey.audioVolume
     public static let commandName = "RCVAVolSet"
     public static let paramName = "Vol"

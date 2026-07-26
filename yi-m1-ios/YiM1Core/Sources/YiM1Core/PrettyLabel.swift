@@ -26,6 +26,10 @@ public enum PrettyLabel {
         .videoEis: ["ON": "On", "OFF": "Off"],
         .audioSwitch: ["ON": "On", "OFF": "Off"],
         .audioNoiseReduce: ["ON": "On", "OFF": "Off"],
+        // Percent, 1-100 (measured). A very low level is the usual cause of
+        // near-silent audio, so it is labelled rather than left as a bare number.
+        .audioVolume: ["10": "10% (quiet)", "25": "25%", "50": "50%",
+                       "75": "75%", "100": "100%"],
     ]
 
     /// Map a raw API value to a readable label for the given setting. Display only - see file

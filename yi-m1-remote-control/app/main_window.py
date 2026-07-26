@@ -148,6 +148,9 @@ _PRETTY_LABELS = {
     "VideoEis": {"ON": "On", "OFF": "Off"},
     "VASwitch": {"ON": "On", "OFF": "Off"},
     "VANR": {"ON": "On", "OFF": "Off"},
+    # Percent, 1-100 (measured). Marked so a very low level is recognisable as the
+    # cause of near-silent audio rather than looking like an arbitrary number.
+    "VAVol": {"10": "10% (quiet)", "25": "25%", "50": "50%", "75": "75%", "100": "100%"},
     "VideoFormat": {"4K_30": "4K 30p", "2K_30": "2K 30p", "FHD_60": "1080 60p", "FHD_30": "1080 30p",
                     "FHD_24": "1080 24p \u2605",
                     "720P_60": "720 60p", "720P_30": "720 30p", "720P_24": "720 24p",

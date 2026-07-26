@@ -148,3 +148,29 @@ final class ExposureModeValueTests: XCTestCase {
                        ["command": "RCSwitchDialMode", "DialMode": "Scene"])
     }
 }
+
+/// Mic level scale, measured on hardware 2026-07-26.
+final class AudioVolumeScaleTests: XCTestCase {
+
+    /// Every value 1...100 is echoed back by the camera, so the scale is percent. "0" is the
+    /// single value it rejects (it keeps the previous setting), so it must not be offered -
+    /// muting is what the Audio on/off switch is for.
+    func testZeroIsNotOfferedBecauseTheCameraRejectsIt() {
+        XCTAssertFalse(AudioVolume.allCases.map(\.rawValue).contains("0"),
+                       "0 is rejected by the camera; use RCVASwitchSet to mute.")
+    }
+
+    func testAllOfferedLevelsAreInTheMeasuredRange() {
+        for level in AudioVolume.allCases.compactMap({ Int($0.rawValue) }) {
+            XCTAssertTrue((1...100).contains(level), "\(level) is outside the measured 1...100 scale")
+        }
+    }
+
+    /// A 2% level is what produced a silent recording; the labels exist so a quiet setting is
+    /// recognisable as such in the picker instead of reading as a bare number.
+    func testLowLevelIsLabelledAsQuiet() {
+        XCTAssertTrue(PrettyLabel.prettyLabel(for: .audioVolume, rawValue: "10")
+                        .lowercased().contains("quiet"))
+        XCTAssertEqual(PrettyLabel.prettyLabel(for: .audioVolume, rawValue: "100"), "100%")
+    }
+}
