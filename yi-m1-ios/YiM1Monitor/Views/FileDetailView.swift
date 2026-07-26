@@ -147,11 +147,18 @@ struct FileDetailView<Session: CameraSessionProtocol>: View {
     }
 
     private func loadPreview() async {
+        // Video has no preview on this camera, and asking for one is actively harmful: the
+        // camera ignores the quality parameter and starts streaming the whole clip, which tore
+        // the session down entirely on macOS (2026-07-24). The comment here used to claim video
+        // was excluded while nothing actually checked - now it does.
+        guard !file.isVideo else {
+            previewFailed = true
+            return
+        }
         do {
             // MidThumb (~228KB) - the same quality the post-shot review uses; it's known to
             // decode fine (occasional "premature end of data" log warnings are harmless, see
-            // DEVELOPMENT_PLAN.md). Not applied to video files - GetFile likely won't return a
-            // decodable still for those; previewFailed's fallback icon covers it either way.
+            // DEVELOPMENT_PLAN.md).
             let data = try await session.fetchFileData(file.path, quality: .medium)
             if let image = UIImage(data: data) {
                 previewImage = image

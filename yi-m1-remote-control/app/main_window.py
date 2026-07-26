@@ -644,6 +644,17 @@ class LiveViewWidget(QWidget):
         painter.drawText(int(rect.left()) + 6, int(rect.top()) + 16, label)
 
 
+def _is_video_path(path: str) -> bool:
+    """Video files have no usable thumbnail on this camera.
+
+    Asking for a thumbnail/MidThumb of a video makes the camera ignore the quality parameter
+    and stream the entire clip instead, which used to tear down the whole session (see
+    CameraSession._do_fetch_image). Matching on the extension rather than GetFileList's
+    "filetype" field because the extension is present in every response shape we handle.
+    """
+    return str(path).upper().endswith((".MP4", ".MOV", ".AVI"))
+
+
 class FileBrowserDialog(QDialog):
     """Browse/download/delete files on the camera's SD card over Wi-Fi.
 
@@ -790,8 +801,18 @@ class FileBrowserDialog(QDialog):
 
     def _on_item_double_clicked(self, item: QListWidgetItem):
         path = item.data(Qt.ItemDataRole.UserRole)
-        if path:
-            self.session.request_file_preview(path)
+        if not path:
+            return
+        if _is_video_path(path):
+            # Previewing a video used to drop the connection entirely (the camera streams the
+            # whole clip when asked for a thumbnail). Download it instead.
+            QMessageBox.information(
+                self, "No preview for video",
+                "This camera cannot produce a thumbnail for video files - asking for one makes "
+                "it stream the entire clip.\n\nUse Download to save the file and play it "
+                "locally.")
+            return
+        self.session.request_file_preview(path)
 
     def _on_thumb_ready(self, path: str, image: QImage):
         icon = QIcon(QPixmap.fromImage(image))
@@ -876,6 +897,8 @@ class FileBrowserDialog(QDialog):
         # flowing), and _on_thumb_ready fills the icons in as they land. Cached ones apply
         # immediately and aren't re-fetched.
         for path, item in self._items_by_path.items():
+            if _is_video_path(path):
+                continue          # no thumbnail exists for video - see _is_video_path
             cached = self._thumb_cache.get(path)
             if cached is not None:
                 item.setIcon(cached)
@@ -924,6 +947,13 @@ class MainWindow(QMainWindow):
         self._pending_setting_values = {}
         self._setting_chips = {}        # metadata_key -> chip QWidget (for show/hide by mode)
         self._video_readonly = {}       # metadata_key -> value QLabel
+        # False until the camera's own settings have arrived in live-view metadata. Until then
+        # the combo boxes still show enum index 0 (a default we invented), NOT what the camera
+        # is actually set to - so they must not be clickable: clicking would send our made-up
+        # default to a camera that was configured correctly on its own body. The app never
+        # pushes settings on connect (verified 2026-07-24); this closes the one window where a
+        # user click could do it by accident.
+        self._metadata_synced = False
 
         central = QWidget()
         root = QVBoxLayout(central)
@@ -1247,6 +1277,13 @@ class MainWindow(QMainWindow):
             self.live_view.set_image_aspect(chosen.value)
 
     def _on_live_metadata(self, data: dict):
+        if not self._metadata_synced and data:
+            # First metadata frame: the combos are about to be filled with the CAMERA's values
+            # (below), so from here on they are safe to interact with.
+            self._metadata_synced = True
+            log("_on_live_metadata: first metadata received - settings now reflect the camera "
+                "(%d fields), controls unlocked" % len(data))
+            self._set_controls_enabled(True)
         self.live_view.set_video_format(data.get("VideoFormat"))
         if "ImageAspect" not in self._pending_setting_values:
             self.live_view.set_image_aspect(data.get("ImageAspect"))
@@ -1511,6 +1548,7 @@ class MainWindow(QMainWindow):
 
     def _on_connected(self):
         self._connected = True
+        self._metadata_synced = False
         self._set_controls_enabled(True)
         self._set_status("Connected")
         self._refresh_connection_ui()
@@ -1577,7 +1615,10 @@ class MainWindow(QMainWindow):
         self.diag_btn.setEnabled(on)
         self.peaking_btn.setEnabled(on and _PEAKING_AVAILABLE)
         self.files_btn.setEnabled(on)
-        self.settings_container.setEnabled(on)
+        # Settings stay locked until the camera's own values have arrived (see
+        # _metadata_synced): before that the combos show OUR enum defaults, not the camera's
+        # configuration, and a click would overwrite a correctly-set camera with them.
+        self.settings_container.setEnabled(on and self._metadata_synced)
         if not on:
             self.live_view.set_peaking_overlay(None)
 

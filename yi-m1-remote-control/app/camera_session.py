@@ -637,24 +637,69 @@ class CameraSession(QThread):
             img.width(), img.height(), len(data)))
         self.photoReviewReady.emit(img)
 
+    # A thumbnail/preview response should be small - photo MidThumb measured ~228 KB against
+    # ~32 MB originals. Anything past this is the camera ignoring the quality parameter and
+    # streaming the whole file, which is exactly what happens for VIDEO (see _do_fetch_image).
+    MAX_PREVIEW_BYTES = 4 * 1024 * 1024
+
     def _do_fetch_image(self, path: str, quality, signal):
         """Shared in-memory image fetch for thumbnails/previews (2026-07-19). Failures are
         silent by design - a missing thumbnail just leaves the generic row icon, matching the
-        iOS ThumbnailStore's failed-path behavior."""
+        iOS ThumbnailStore's failed-path behavior.
+
+        BUG FIX 2026-07-24 - previewing a VIDEO dropped the whole connection. The camera does
+        not honour the thumbnail/MidThumb quality parameter for video files: it starts streaming
+        the ENTIRE clip (hundreds of MB). This used to be a plain `request(...)` with
+        preload_content left on, so urllib3 tried to buffer all of it, blew the 15 s timeout
+        mid-transfer and tore the socket down with the camera still writing. The camera serves
+        one client at a time, so it was left mid-response, the following GetCameraStatus polls
+        failed, and after three of them the camera-vanished detector disconnected the app. That
+        is why photos were fine and videos killed the session.
+
+        Now the body is streamed with a hard cap: past MAX_PREVIEW_BYTES we stop, drain the
+        rest of the response so the camera can finish writing cleanly, and give up on the
+        preview. Draining rather than slamming the socket shut is the part that keeps the
+        session alive."""
         get_cmd = CmdFileGet(path, quality)
         json_str = json.dumps(get_cmd.to_json(), separators=(",", ":"))
         url = "http://%s/?data=%s" % (INET_ADDRESS_CAMERA, json_str)
+        response = None
         try:
-            response = self._http.request("GET", url, timeout=15.0)
+            response = self._http.request("GET", url, timeout=15.0, preload_content=False)
+            if response.status != 200:
+                log("_do_fetch_image: %s (%s) -> status=%s" % (path, quality, response.status))
+                return
+            chunks = []
+            total = 0
+            oversized = False
+            for chunk in response.stream(64 * 1024):
+                chunks.append(chunk)
+                total += len(chunk)
+                if total > self.MAX_PREVIEW_BYTES:
+                    oversized = True
+                    break
+            if oversized:
+                log("_do_fetch_image: %s (%s) exceeded %d bytes - the camera is streaming the "
+                    "whole file instead of a thumbnail (expected for video). Aborting preview."
+                    % (path, quality, self.MAX_PREVIEW_BYTES))
+                return
+            img = QImage.fromData(b"".join(chunks))
+            if not img.isNull():
+                signal.emit(path, img)
         except Exception as e:
             log("_do_fetch_image: %s (%s) failed: %r" % (path, quality, e))
-            return
-        if response.status != 200:
-            log("_do_fetch_image: %s (%s) -> status=%s" % (path, quality, response.status))
-            return
-        img = QImage.fromData(response.data)
-        if not img.isNull():
-            signal.emit(path, img)
+        finally:
+            if response is not None:
+                # Let the camera finish its side before the socket goes away; a half-read
+                # response is what wedged it previously.
+                try:
+                    response.drain_conn()
+                except Exception:
+                    pass
+                try:
+                    response.release_conn()
+                except Exception:
+                    pass
 
     def _do_toggle_recording(self):
         if time.time() - self._last_record_command_at < self.RECORD_COMMAND_COOLDOWN:
