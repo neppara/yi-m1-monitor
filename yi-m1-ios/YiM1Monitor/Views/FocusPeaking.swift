@@ -2,7 +2,7 @@
 // color. The user shoots a manual-focus lens - this is the highest-value monitor feature, and
 // unlike exposure-based tools (histogram/zebras), it isn't invalidated by the live-view preview's
 // known auto-exposure quirk (edges are edges regardless of brightness), so it works pre-record.
-import CoreImage
+@preconcurrency import CoreImage
 import CoreImage.CIFilterBuiltins
 import UIKit
 
