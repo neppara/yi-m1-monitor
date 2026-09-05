@@ -30,16 +30,16 @@ targets:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         UIRequiresFullScreen: true
-        NSBluetoothAlwaysUsageDescription: "YI M1 Monitor uses Bluetooth to pair with your camera and read its Wi-Fi credentials."
-        NSLocalNetworkUsageDescription: "YI M1 Monitor connects to your camera over its own Wi-Fi network to show live view and send camera commands."
-        NSPhotoLibraryAddUsageDescription: "YI M1 Monitor saves downloaded photos and videos to your Photos library."
+        NSBluetoothAlwaysUsageDescription: "YI M1 Monitor 需要使用蓝牙与相机配对，并读取相机本次生成的 Wi-Fi 连接信息。"
+        NSLocalNetworkUsageDescription: "YI M1 Monitor 需要连接相机自身的 Wi-Fi 网络，以显示实时取景并发送相机控制指令。"
+        NSPhotoLibraryAddUsageDescription: "YI M1 Monitor 需要将从相机下载的照片和视频保存到系统照片图库。"
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.yim1monitor.app
-        PRODUCT_NAME: YiM1Monitor
-        SWIFT_VERSION: 5.0
-        TARGETED_DEVICE_FAMILY: "1" # iPhone only (portrait-first v1 scope, Part 6)
-        GENERATE_INFOPLIST_FILE: NO
-        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+      settings:
+        base:
+          PRODUCT_BUNDLE_IDENTIFIER: com.yim1monitor.app
+          PRODUCT_NAME: YiM1Monitor
+          SWIFT_VERSION: 5.0
+          TARGETED_DEVICE_FAMILY: "1" # iPhone only
+          GENERATE_INFOPLIST_FILE: NO
+          ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
