@@ -75,9 +75,8 @@ Approve the Bluetooth and Local Network prompts. Diagnostics are logged to
 
 ### iOS app
 
-Requires a **Mac with Xcode** — there is no pre-built `.ipa` (Apple code
-signing). A free Apple ID works for sideloading (the build expires after ~7
-days and must be rebuilt).
+- iOS 15+
+- A Mac with Xcode is required for normal development and signing.
 
 ```sh
 cd yi-m1-ios
@@ -86,8 +85,14 @@ xcodegen generate            # generates the .xcodeproj from project.yml
 open YiM1Monitor.xcodeproj    # set your signing team, then build to your iPhone
 ```
 
-Core protocol logic lives in the `YiM1Core` Swift package and is unit-tested
-(`swift test`, 53 tests) — no camera required to run those.
+A GitHub Actions workflow can also build an **unsigned** `YiM1Monitor.ipa` artifact.
+Run **Build YiM1Monitor IPA** from the repository's Actions tab, then download the
+`YiM1Monitor-IPA` artifact from the completed run. The IPA still needs to be signed
+before installation on a normal iPhone.
+
+Core protocol logic lives in the `YiM1Core` Swift package and is unit-tested with
+`swift test` — no camera is required to run those tests. The IPA workflow runs the
+core test suite before building the app.
 
 ---
 
