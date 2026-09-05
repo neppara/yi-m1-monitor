@@ -4,7 +4,7 @@ import PackageDescription
 let package = Package(
     name: "YiM1Core",
     platforms: [
-        .iOS(.v16),
+        .iOS(.v15),
         .macOS(.v13), // host platform, lets us `swift test` pure logic without a simulator
     ],
     products: [
