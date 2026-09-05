@@ -1,26 +1,25 @@
-// Design system for YI M1 Monitor (iOS). Same token vocabulary as the macOS app's
-// ../yi-m1-remote-control/app/theme.py (approved 2026-07-07: dark "pro-monitor",
-// monochrome + one amber accent, red reserved for recording only) - this is the
-// SwiftUI-native rendering of the identical values, not a separate design.
+// Design system for YI M1 Monitor (iOS). Dark pro-monitor palette with one amber accent.
 import SwiftUI
+import UIKit
+
+enum AppLayout {
+    /// iPhone SE (1st gen) / iPhone 5s class: 320×568 pt in portrait.
+    static let isFourInchPhone = min(UIScreen.main.bounds.width, UIScreen.main.bounds.height) <= 320
+}
 
 enum AppColor {
-    // Surfaces, darkest (page) to lightest (raised controls).
     static let bg = Color(hex: 0x0c0d0f)
     static let surface = Color(hex: 0x16181b)
     static let surface2 = Color(hex: 0x1e2124)
     static let liveBG = Color(hex: 0x14_15_17)
 
-    // Hairlines.
     static let hairline = Color(hex: 0x2a2d31)
     static let hairlineSoft = Color(hex: 0x1c1f22)
 
-    // Text tiers.
     static let text = Color(hex: 0xf3f4f6)
     static let text2 = Color(hex: 0x9ba1a8)
     static let text3 = Color(hex: 0x63696f)
 
-    // The single accent + reserved semantic colors.
     static let accent = Color(hex: 0xf5a623)
     static let accentDim = Color(hex: 0x8a6320)
     static let record = Color(hex: 0xff3b30)
@@ -35,18 +34,21 @@ enum AppRadius {
 
 enum AppSpace {
     static let xs: CGFloat = 4
-    static let sm: CGFloat = 8
-    static let md: CGFloat = 12
-    static let lg: CGFloat = 16
-    static let xl: CGFloat = 20
+    static let sm: CGFloat = AppLayout.isFourInchPhone ? 6 : 8
+    static let md: CGFloat = AppLayout.isFourInchPhone ? 10 : 12
+    static let lg: CGFloat = AppLayout.isFourInchPhone ? 12 : 16
+    static let xl: CGFloat = AppLayout.isFourInchPhone ? 16 : 20
 }
 
 enum AppFont {
-    static let caption: CGFloat = 11
-    static let small: CGFloat = 12
-    static let body: CGFloat = 13
-    static let value: CGFloat = 14
-    static let heading: CGFloat = 16
+    /// Slightly tighter type scale on the 320-pt-wide iPhone SE (1st gen). Chinese labels are
+    /// shorter than the old English labels, so this keeps the monitor readable without wasting
+    /// live-view area or forcing controls to wrap.
+    static let caption: CGFloat = AppLayout.isFourInchPhone ? 10.5 : 11
+    static let small: CGFloat = AppLayout.isFourInchPhone ? 11.5 : 12
+    static let body: CGFloat = AppLayout.isFourInchPhone ? 12.5 : 13
+    static let value: CGFloat = AppLayout.isFourInchPhone ? 13.5 : 14
+    static let heading: CGFloat = AppLayout.isFourInchPhone ? 15 : 16
 }
 
 extension Color {
@@ -59,8 +61,6 @@ extension Color {
     }
 }
 
-/// Amber-bordered "pill" look shared by the guide toggles and setting chips - the SwiftUI
-/// equivalent of theme.py's guide_toggle_qss()/status_chip_qss().
 struct PillButtonStyle: ButtonStyle {
     var active: Bool = false
 
@@ -68,8 +68,8 @@ struct PillButtonStyle: ButtonStyle {
         configuration.label
             .font(.system(size: AppFont.small, weight: .medium))
             .foregroundStyle(active ? AppColor.accent : AppColor.text2)
-            .padding(.horizontal, AppSpace.md)
-            .padding(.vertical, AppSpace.sm)
+            .padding(.horizontal, AppLayout.isFourInchPhone ? 4 : AppSpace.sm)
+            .padding(.vertical, AppLayout.isFourInchPhone ? 4 : AppSpace.sm)
             .background(AppColor.surface)
             .overlay(
                 RoundedRectangle(cornerRadius: AppRadius.sm)
@@ -85,7 +85,7 @@ struct StatusChipStyle: ViewModifier {
         content
             .font(.system(size: AppFont.small))
             .foregroundStyle(AppColor.text2)
-            .padding(.horizontal, AppSpace.md)
+            .padding(.horizontal, AppLayout.isFourInchPhone ? AppSpace.sm : AppSpace.md)
             .padding(.vertical, AppSpace.xs + 1)
             .background(AppColor.surface)
             .overlay(
