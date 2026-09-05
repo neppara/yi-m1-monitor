@@ -1,7 +1,3 @@
-// The central capture control. Photo mode: white ring + disc. Video mode: red ring + dot that
-// becomes a red rounded square while recording. Port of main_window.py's ShutterButton
-// (QPainter ring/gap/inner-shape -> SwiftUI Canvas), same 76pt size (>= the 64pt touch-target
-// minimum from Part 6).
 import SwiftUI
 import YiM1Core
 
@@ -11,7 +7,7 @@ struct ShutterButton: View {
     var isEnabled: Bool = true
     var action: () -> Void
 
-    private let size: CGFloat = 76
+    private var size: CGFloat { AppLayout.isFourInchPhone ? 68 : 76 }
 
     var body: some View {
         Button(action: action) {
@@ -33,7 +29,10 @@ struct ShutterButton: View {
                 case .video:
                     if isRecording {
                         let s = canvasSize.width * 0.30
-                        inner.addRoundedRect(in: CGRect(x: cx - s / 2, y: cy - s / 2, width: s, height: s), cornerSize: CGSize(width: 4, height: 4))
+                        inner.addRoundedRect(
+                            in: CGRect(x: cx - s / 2, y: cy - s / 2, width: s, height: s),
+                            cornerSize: CGSize(width: 4, height: 4)
+                        )
                     } else {
                         let ir = canvasSize.width * 0.21
                         inner.addEllipse(in: CGRect(x: cx - ir, y: cy - ir, width: 2 * ir, height: 2 * ir))
@@ -45,5 +44,6 @@ struct ShutterButton: View {
         }
         .disabled(!isEnabled)
         .buttonStyle(.plain)
+        .accessibilityLabel(mode == .photo ? "拍照" : (isRecording ? "停止录像" : "开始录像"))
     }
 }
