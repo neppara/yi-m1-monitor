@@ -1,5 +1,3 @@
-// Crop / Thirds / Diagonals toggles - split out per the user's revision request (previously one
-// "Guides" button). Amber when active, matching theme.py's guide_toggle_qss().
 import SwiftUI
 import YiM1Core
 
@@ -7,15 +5,14 @@ struct GuideToggles: View {
     @Binding var showCrop: Bool
     @Binding var showThirds: Bool
     @Binding var showDiagonals: Bool
-    /// Video mode (2026-07-19): the crop there is a fact of the camera (FHD/4K always record
-    /// 16:9, unchangeable remotely), so the overlay is permanently on and this toggle locks -
-    /// shown active but not tappable. Photo mode keeps it a real toggle.
     var cropAlwaysOn: Bool = false
 
+    private var iconFrame: CGFloat { AppLayout.isFourInchPhone ? 28 : 40 }
+
     var body: some View {
-        HStack(spacing: AppSpace.sm) {
+        HStack(spacing: AppLayout.isFourInchPhone ? 4 : AppSpace.sm) {
             cropToggle
-            toggle(isOn: $showThirds, systemImage: AppIcon.thirds, label: "Thirds")
+            toggle(isOn: $showThirds, systemImage: AppIcon.thirds, label: "三分线")
             diagonalsToggle
         }
     }
@@ -25,12 +22,12 @@ struct GuideToggles: View {
             showCrop.toggle()
         } label: {
             Image(systemName: AppIcon.crop)
-                .font(.system(size: 16))
-                .frame(width: 40, height: 40)
+                .font(.system(size: AppLayout.isFourInchPhone ? 14 : 16))
+                .frame(width: iconFrame, height: AppLayout.isFourInchPhone ? 32 : 40)
         }
         .buttonStyle(PillButtonStyle(active: showCrop || cropAlwaysOn))
         .disabled(cropAlwaysOn)
-        .accessibilityLabel("Crop")
+        .accessibilityLabel("裁切范围")
     }
 
     private func toggle(isOn: Binding<Bool>, systemImage: String, label: String) -> some View {
@@ -38,8 +35,8 @@ struct GuideToggles: View {
             isOn.wrappedValue.toggle()
         } label: {
             Image(systemName: systemImage)
-                .font(.system(size: 16))
-                .frame(width: 40, height: 40)
+                .font(.system(size: AppLayout.isFourInchPhone ? 14 : 16))
+                .frame(width: iconFrame, height: AppLayout.isFourInchPhone ? 32 : 40)
         }
         .buttonStyle(PillButtonStyle(active: isOn.wrappedValue))
         .accessibilityLabel(label)
@@ -50,10 +47,10 @@ struct GuideToggles: View {
             showDiagonals.toggle()
         } label: {
             DiagonalsIcon(color: showDiagonals ? AppColor.accent : AppColor.text2)
-                .frame(width: 16, height: 16)
-                .frame(width: 40, height: 40)
+                .frame(width: AppLayout.isFourInchPhone ? 14 : 16, height: AppLayout.isFourInchPhone ? 14 : 16)
+                .frame(width: iconFrame, height: AppLayout.isFourInchPhone ? 32 : 40)
         }
         .buttonStyle(PillButtonStyle(active: showDiagonals))
-        .accessibilityLabel("Diagonals")
+        .accessibilityLabel("对角线")
     }
 }
