@@ -1,15 +1,9 @@
-// File detail screen - the discoverable replacement for swipe-only actions (user feedback
-// 2026-07-11: swipe-to-reveal download/delete was unintuitive). Reached by tapping a row in
-// FileBrowserView; shows a MidThumb preview + metadata + explicit Save to Photos / Share /
-// Delete buttons.
 import SwiftUI
 import YiM1Core
 
 struct FileDetailView<Session: CameraSessionProtocol>: View {
     @ObservedObject var session: Session
     let file: CameraFile
-    /// Called after a successful delete, so the browser list can refresh - this view also
-    /// dismisses itself right after (nothing left to show).
     var onDeleted: () -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -39,14 +33,14 @@ struct FileDetailView<Session: CameraSessionProtocol>: View {
         .sheet(item: $shareItem) { item in
             ActivityView(activityItems: [item.url])
         }
-        .alert("Delete file?", isPresented: $confirmDelete) {
-            Button("Cancel", role: .cancel) {}
-            Button("Delete", role: .destructive) { Task { await performDelete() } }
+        .alert("删除文件？", isPresented: $confirmDelete) {
+            Button("取消", role: .cancel) {}
+            Button("删除", role: .destructive) { Task { await performDelete() } }
         } message: {
-            Text("Delete \(file.filename) from the camera? This cannot be undone.")
+            Text("确定从相机中删除 \(file.filename) 吗？此操作无法撤销。")
         }
-        .alert("Save to Photos", isPresented: $showResult) {
-            Button("OK", role: .cancel) {}
+        .alert("保存到照片", isPresented: $showResult) {
+            Button("好", role: .cancel) {}
         } message: {
             Text(resultMessage ?? "")
         }
@@ -66,15 +60,13 @@ struct FileDetailView<Session: CameraSessionProtocol>: View {
             } else if previewFailed {
                 VStack(spacing: AppSpace.sm) {
                     Image(systemName: file.isVideo ? AppIcon.video : AppIcon.camera)
-                        .font(.system(size: 32))
+                        .font(.system(size: AppLayout.isFourInchPhone ? 28 : 32))
                         .foregroundStyle(AppColor.text3)
-                    Text(file.isVideo ? "No preview for video" : "No preview available")
+                    Text(file.isVideo ? "视频没有预览图" : "没有可用预览")
                         .font(.system(size: AppFont.caption))
                         .foregroundStyle(AppColor.text3)
                     if file.isVideo {
-                        // Says why, so it does not read as a bug. The camera genuinely cannot
-                        // render a still for a clip - see FileDetailView.loadPreview.
-                        Text("The camera cannot render one.\nDownload the clip to view it.")
+                        Text("相机无法为视频生成静态预览。\n请下载视频后查看。")
                             .font(.system(size: AppFont.caption))
                             .foregroundStyle(AppColor.text3)
                             .multilineTextAlignment(.center)
@@ -84,16 +76,16 @@ struct FileDetailView<Session: CameraSessionProtocol>: View {
                 ProgressView().tint(AppColor.accent)
             }
         }
-        .frame(height: 280)
+        .frame(height: AppLayout.isFourInchPhone ? 220 : 280)
     }
 
     private var metadataSection: some View {
         VStack(alignment: .leading, spacing: AppSpace.sm) {
-            metadataRow(label: "Type", value: file.filetype.isEmpty ? "—" : file.filetype)
+            metadataRow(label: "类型", value: file.filetype.isEmpty ? "—" : file.filetype)
             if let date = file.date {
-                metadataRow(label: "Date", value: date.formatted(date: .abbreviated, time: .shortened))
+                metadataRow(label: "日期", value: date.formatted(date: .abbreviated, time: .shortened))
             }
-            metadataRow(label: "Protected", value: file.isProtected ? "Yes" : "No")
+            metadataRow(label: "保护", value: file.isProtected ? "是" : "否")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(AppSpace.md)
@@ -115,7 +107,7 @@ struct FileDetailView<Session: CameraSessionProtocol>: View {
             Button {
                 Task { await saveToPhotos() }
             } label: {
-                Label("Save to Photos", systemImage: "square.and.arrow.down")
+                Label("保存到照片", systemImage: "square.and.arrow.down")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
@@ -124,7 +116,7 @@ struct FileDetailView<Session: CameraSessionProtocol>: View {
             Button {
                 Task { await shareFile() }
             } label: {
-                Label("Share / Download", systemImage: AppIcon.download)
+                Label("分享 / 下载", systemImage: AppIcon.download)
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
@@ -132,11 +124,12 @@ struct FileDetailView<Session: CameraSessionProtocol>: View {
             Button(role: .destructive) {
                 confirmDelete = true
             } label: {
-                Label("Delete", systemImage: AppIcon.trash)
+                Label("删除", systemImage: AppIcon.trash)
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
         }
+        .font(.system(size: AppFont.body))
         .disabled(isWorking)
     }
 
@@ -147,7 +140,7 @@ struct FileDetailView<Session: CameraSessionProtocol>: View {
                 .foregroundStyle(AppColor.text)
             ProgressView(value: workingProgress)
                 .tint(AppColor.accent)
-                .frame(maxWidth: 220)
+                .frame(maxWidth: AppLayout.isFourInchPhone ? 180 : 220)
         }
         .padding(AppSpace.lg)
         .background(AppColor.surface2)
@@ -155,18 +148,11 @@ struct FileDetailView<Session: CameraSessionProtocol>: View {
     }
 
     private func loadPreview() async {
-        // Video has no preview on this camera, and asking for one is actively harmful: the
-        // camera ignores the quality parameter and starts streaming the whole clip, which tore
-        // the session down entirely on macOS (2026-07-24). The comment here used to claim video
-        // was excluded while nothing actually checked - now it does.
         guard !file.isVideo else {
             previewFailed = true
             return
         }
         do {
-            // MidThumb (~228KB) - the same quality the post-shot review uses; it's known to
-            // decode fine (occasional "premature end of data" log warnings are harmless, see
-            // DEVELOPMENT_PLAN.md).
             let data = try await session.fetchFileData(file.path, quality: .medium)
             if let image = UIImage(data: data) {
                 previewImage = image
@@ -180,7 +166,7 @@ struct FileDetailView<Session: CameraSessionProtocol>: View {
 
     private func shareFile() async {
         isWorking = true
-        workingLabel = "Preparing file…"
+        workingLabel = "正在准备文件…"
         workingProgress = 0
         defer { isWorking = false }
         let tmpURL = FileManager.default.temporaryDirectory.appendingPathComponent(file.filename)
@@ -192,19 +178,19 @@ struct FileDetailView<Session: CameraSessionProtocol>: View {
             }
             shareItem = ShareItem(url: tmpURL)
         } catch {
-            resultMessage = "Download failed: \(error)"
+            resultMessage = "下载失败：\(error)"
             showResult = true
         }
     }
 
     private func saveToPhotos() async {
         isWorking = true
-        workingLabel = "Saving to Photos…"
+        workingLabel = "正在保存到照片…"
         workingProgress = nil
         defer { isWorking = false }
 
         guard await PhotoLibrarySaver.requestAuthorization() else {
-            resultMessage = "Photos access was denied. Enable it in Settings to save files."
+            resultMessage = "没有“照片”访问权限。请在系统设置中允许后再保存。"
             showResult = true
             return
         }
@@ -212,23 +198,23 @@ struct FileDetailView<Session: CameraSessionProtocol>: View {
             try await PhotoLibrarySaver.downloadAndSave(file, session: session) { progress in
                 Task { @MainActor in workingProgress = progress }
             }
-            resultMessage = "Saved to Photos."
+            resultMessage = "已保存到照片。"
         } catch {
-            resultMessage = "Save failed: \(error)"
+            resultMessage = "保存失败：\(error)"
         }
         showResult = true
     }
 
     private func performDelete() async {
         isWorking = true
-        workingLabel = "Deleting…"
+        workingLabel = "正在删除…"
         workingProgress = nil
         defer { isWorking = false }
         if await session.deleteFiles([file.path]) {
             onDeleted()
             dismiss()
         } else {
-            resultMessage = "Delete failed."
+            resultMessage = "删除失败。"
             showResult = true
         }
     }
