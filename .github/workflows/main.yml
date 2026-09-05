@@ -1,0 +1,56 @@
+name: Build YiM1Monitor IPA
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -s /Applications/Xcode_16.2.app
+          xcodebuild -version
+
+      - name: Install XcodeGen
+        run: |
+          brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: yi-m1-ios
+        run: |
+          xcodegen generate
+
+      - name: Build
+        working-directory: yi-m1-ios
+        run: |
+          xcodebuild \
+            -project YiM1Monitor.xcodeproj \
+            -scheme YiM1Monitor \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            build \
+            CONFIGURATION_BUILD_DIR="$RUNNER_TEMP/build"
+
+      - name: Package IPA
+        run: |
+          mkdir -p Payload
+
+          cp -R "$RUNNER_TEMP/build/YiM1Monitor.app" Payload/
+
+          zip -r YiM1Monitor.ipa Payload
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: YiM1Monitor-IPA
+          path: YiM1Monitor.ipa
