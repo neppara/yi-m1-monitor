@@ -2,7 +2,7 @@ name: YiM1Monitor
 options:
   bundleIdPrefix: com.yim1monitor
   deploymentTarget:
-    iOS: "16.0"
+    iOS: "15.0"
   createIntermediateGroups: true
 
 packages:
