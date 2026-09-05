@@ -1,25 +1,11 @@
-// Live JPEG + overlays (crop/thirds/diagonals) + tap-to-focus + photo-review/download takeover.
-// Port of ../yi-m1-remote-control/app/main_window.py's LiveViewWidget (paintEvent/_draw_crop),
-// translated from QPainter to SwiftUI Canvas. Same rules: crop is mode-aware (photo/video),
-// thirds/diagonals draw inside the crop rect when it's on else across the whole frame, the crop
-// overlay hides while recording (the feed itself already shows the real crop then - macOS fact
-// from ARCHITECTURE.md §12), and review/download-progress take over the whole frame.
-//
-// Rotation: the camera always streams frames in sensor orientation - when it's physically
-// mounted sideways (vertical shooting), the preview arrives rotated. `rotation` is a manual,
-// user-cycled view transform (requested 2026-07-09): the live image and photo review rotate,
-// the guide overlays are drawn in *visual* space with the crop fractions transformed to match
-// (so their text labels stay upright), and tap-to-focus inverse-maps back to sensor pixels.
 import ImageIO
 import SwiftUI
 import YiM1Core
 
-/// Manual live-view rotation for vertical shooting. UI-only - nothing about the camera protocol
-/// changes; frames are just displayed turned.
 enum ViewRotation {
     case none
-    case cw90   // camera mounted with its right side down
-    case ccw90  // camera mounted with its left side down
+    case cw90
+    case ccw90
 
     func next() -> ViewRotation {
         switch self {
@@ -40,17 +26,7 @@ enum ViewRotation {
     var isRotated: Bool { self != .none }
 }
 
-/// The actual decode work: a plain enum with no captured state and no actor isolation, so it can
-/// run on a background `DispatchQueue` without Swift concurrency treating the call as crossing
-/// an actor boundary (same reasoning as `FocusPeakingRenderer` - a `static func` on a
-/// `@MainActor`-isolated type is itself MainActor-isolated, which would make calling it from a
-/// background queue an implicitly-async cross-actor call the compiler warns about).
 private enum LiveFrameDecoding {
-    /// `UIImage(data:)` is lazy - it defers the actual pixel decode until first drawn, so
-    /// decoding "on" a background queue alone isn't enough; the real cost would still land on
-    /// the MainActor the first time SwiftUI drew the image. Forcing an immediate, fully-decoded
-    /// bitmap via `CGImageSourceCreateImageAtIndex` + `kCGImageSourceShouldCacheImmediately`
-    /// moves that cost here instead.
     static func decodeImmediately(_ data: Data) -> UIImage? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
         let options: [CFString: Any] = [
@@ -62,12 +38,6 @@ private enum LiveFrameDecoding {
     }
 }
 
-/// Decodes live-view JPEG bytes into a `UIImage` off the main thread, with the same mandatory
-/// keep-latest frame-dropping `FocusPeakingProcessor` uses. Added 2026-07-11: moving the real
-/// decode cost off the MainActor matters because MainActor contention was directly implicated in
-/// an on-device stutter/fps-drop bug: `LiveViewReceiver`'s `.bufferingNewest(1)` policy makes the
-/// live-view AsyncStream itself drop frames when the MainActor consumer falls behind, so keeping
-/// this consumer fast reduces how often that happens.
 @MainActor
 final class LiveFrameDecoder: ObservableObject {
     @Published private(set) var image: UIImage?
@@ -75,17 +45,11 @@ final class LiveFrameDecoder: ObservableObject {
     private let queue = DispatchQueue(label: "com.yim1.liveview.decode", qos: .userInteractive)
     private var isDecoding = false
     private var pendingData: Data?
-    /// Bumped by `clear()` so an in-flight background decode can't resurrect the frame it was
-    /// working on AFTER the clear - at ~25fps there is almost always a decode mid-flight the
-    /// moment a disconnect clears the canvas, and without this guard its completion handler
-    /// would land on the MainActor right after `clear()` and repaint the stale last frame
-    /// (user-reported on-device 2026-07-12: frozen last frame instead of "Not connected").
-    /// Same generation-counter pattern `FocusPeakingProcessor` already uses for the same reason.
     private var generation = 0
 
     func decode(_ data: Data) {
         guard !isDecoding else {
-            pendingData = data // keep-latest: overwrite, don't queue
+            pendingData = data
             return
         }
         isDecoding = true
@@ -112,10 +76,6 @@ final class LiveFrameDecoder: ObservableObject {
         generation += 1
         image = nil
         pendingData = nil
-        // The in-flight completion (if any) is now generation-stale and will early-return
-        // without ever resetting this - reset it here or the NEXT connection's first
-        // decode(_:) would park everything in pendingData forever behind a flight that
-        // already landed.
         isDecoding = false
     }
 }
@@ -132,16 +92,8 @@ struct LiveViewCanvas: View {
     var photoReview: PhotoReviewState
     var photoReviewImageData: Data?
     var rotation: ViewRotation = .none
-    /// Focus-peaking overlay (edges highlighted in the accent color, transparent elsewhere) -
-    /// same pixel dimensions as the live frame it was derived from, so it's rendered through the
-    /// exact same fitting/rotation path as the live image itself.
     var peakingOverlay: UIImage?
     var onFocus: (Int, Int) -> Void
-    /// Fired from the same `onChange(of: frameData)` that feeds `frameDecoder`, instead of RootView
-    /// separately re-observing `session.latestFrameData` on its own - two `.onChange` modifiers
-    /// watching the same underlying `Data?` doubled the chance of SwiftUI's "tried to update
-    /// multiple times per frame" fault when live-view frames arrive in a burst (observed
-    /// on-device 2026-07-11). One observer, one dispatch point.
     var onNewFrame: ((Data) -> Void)?
 
     @StateObject private var frameDecoder = LiveFrameDecoder()
@@ -167,20 +119,13 @@ struct LiveViewCanvas: View {
                         .position(x: fitted.midX, y: fitted.midY)
                         .allowsHitTesting(false)
                 } else {
-                    Text("Not connected")
+                    Text("未连接")
                         .font(.system(size: AppFont.value))
                         .foregroundStyle(AppColor.text3)
                 }
             }
-            // Smooths the geometry change when the recording letterbox crop engages/disengages
-            // (user feedback 2026-07-12: the switch snapped the image toward the edge for a
-            // beat before settling) - the image now eases from the 4:3 preview footprint to
-            // the cropped 16:9 one in place, centered the whole way.
             .animation(.easeInOut(duration: 0.25), value: recordingBarsCropApplies)
             .contentShape(Rectangle())
-            // iOS 15-compatible tap-location capture. SwiftUI's coordinate-returning
-            // onTapGesture is iOS 17+, so a zero-distance DragGesture is used instead.
-            // Handling only onEnded preserves tap-to-focus semantics while exposing location.
             .gesture(
                 DragGesture(minimumDistance: 0, coordinateSpace: .local)
                     .onEnded { value in
@@ -199,9 +144,6 @@ struct LiveViewCanvas: View {
         .background(AppColor.liveBG)
         .clipped()
         .onChange(of: frameData) { newValue in
-            // A nil newValue (e.g. after disconnect) must clear the decoded image too, or the
-            // last frame stays frozen on screen indefinitely - this early-returned before,
-            // leaking the previous connection's freeze-frame into the next one.
             guard let newValue else {
                 frameDecoder.clear()
                 return
@@ -214,8 +156,6 @@ struct LiveViewCanvas: View {
         }
     }
 
-    /// Hide peaking while the review/download takeover is showing - those already cover the
-    /// whole frame with different content, and the review image isn't the live sensor feed.
     private var shouldShowPeaking: Bool {
         switch photoReview {
         case .ready, .downloading: return false
@@ -223,49 +163,27 @@ struct LiveViewCanvas: View {
         }
     }
 
-    // MARK: - Recording letterbox crop
-
-    /// During 16:9 video recording the camera bakes black letterbox bars INTO the stream (a 4:3
-    /// frame with the 16:9 recording content centered inside - visible in the user's 2026-07-12
-    /// field screenshots). Cropping them off at display time (user request, same day) both
-    /// reclaims the wasted screen space and fixes the guides: thirds/diagonals span the visible
-    /// frame during recording, which with the bars included was 4:3, not the real 16:9 capture
-    /// area. 2K is deliberately excluded - its measured crop is the full sensor frame, so
-    /// whether its recording stream is letterboxed at all is unverified.
     private var recordingBarsCropApplies: Bool {
         guard isRecording, mode == .video, let videoFormat else { return false }
         let upper = videoFormat.uppercased()
-        // 720P added 2026-07-24: 16:9 like FHD (same measured crop), so it almost certainly
-        // bakes the same letterbox bars. Not directly measured - revisit if 720p live view
-        // looks wrong while recording. VGA_240 excluded: it is 4:3 (like 2K), no letterbox.
         return upper.hasPrefix("FHD") || upper.hasPrefix("4K") || upper.hasPrefix("720P")
     }
 
-    /// Crops the baked-in letterbox bars (centered 16:9 content region) off a frame when
-    /// `recordingBarsCropApplies`; returns the image unchanged otherwise. `CGImage.cropping` is
-    /// cheap (it references the same backing pixels, no copy), so doing this per displayed frame
-    /// on the MainActor is fine.
     private func recordingDisplayImage(_ image: UIImage) -> UIImage {
         guard recordingBarsCropApplies, let cgImage = image.cgImage else { return image }
         let width = CGFloat(cgImage.width)
         let height = CGFloat(cgImage.height)
         let contentHeight = width * 9 / 16
-        guard contentHeight < height - 2 else { return image } // already 16:9 (or wider) - nothing to crop
+        guard contentHeight < height - 2 else { return image }
         let contentRect = CGRect(x: 0, y: (height - contentHeight) / 2, width: width, height: contentHeight)
         guard let cropped = cgImage.cropping(to: contentRect) else { return image }
         return UIImage(cgImage: cropped)
     }
 
-    // MARK: - Rotation helpers
-
-    /// The size the image occupies on screen: 90-degree rotations swap width and height.
     private func displaySize(of imageSize: CGSize) -> CGSize {
         rotation.isRotated ? CGSize(width: imageSize.height, height: imageSize.width) : imageSize
     }
 
-    /// Renders the image rotated inside `fitted` (which was computed from displaySize).
-    /// rotationEffect is purely visual, so the inner frame uses the pre-rotation dimensions
-    /// (fitted's, swapped back) and the outer position centers the rotated result.
     @ViewBuilder
     private func rotatedImage(_ image: UIImage, fitted: CGRect) -> some View {
         Image(uiImage: image)
@@ -279,8 +197,6 @@ struct LiveViewCanvas: View {
             .position(x: fitted.midX, y: fitted.midY)
     }
 
-    /// Maps a normalized point in visual (rotated, on-screen) space back to normalized sensor
-    /// space, for tap-to-focus. Inverse of the rotation applied to the image.
     private func sensorRelativePoint(fromVisual p: CGPoint) -> CGPoint {
         switch rotation {
         case .none: return p
@@ -289,8 +205,6 @@ struct LiveViewCanvas: View {
         }
     }
 
-    /// Transforms a sensor-space crop rect (normalized fractions) into visual space, so the
-    /// guide overlay can be drawn unrotated (keeping its text labels upright).
     private func visualCrop(_ c: CropRect) -> CropRect {
         switch rotation {
         case .none: return c
@@ -298,8 +212,6 @@ struct LiveViewCanvas: View {
         case .ccw90: return CropRect(c.y, 1 - c.x - c.width, c.height, c.width)
         }
     }
-
-    // MARK: - Overlays
 
     @ViewBuilder
     private func overlay(fitted: CGRect) -> some View {
@@ -322,7 +234,7 @@ struct LiveViewCanvas: View {
                     rotatedImage(reviewImage, fitted: fitted)
                 }
             }
-            Text("Review")
+            Text("回放")
                 .font(.system(size: AppFont.caption))
                 .foregroundStyle(AppColor.text)
                 .padding(8)
@@ -331,13 +243,15 @@ struct LiveViewCanvas: View {
 
     private func downloadOverlay(bytesReceived: Int, total: Int) -> some View {
         VStack(spacing: AppSpace.sm) {
-            Text("Downloading photo preview…")
+            Text("正在下载照片预览…")
                 .font(.system(size: AppFont.caption))
                 .foregroundStyle(AppColor.text)
             ProgressView(value: total > 0 ? Double(bytesReceived) / Double(total) : nil)
                 .tint(AppColor.accent)
-                .frame(maxWidth: 220)
-            Text(total > 0 ? "\(Int(100 * Double(bytesReceived) / Double(total)))%" : String(format: "%.1f KB", Double(bytesReceived) / 1024))
+                .frame(maxWidth: AppLayout.isFourInchPhone ? 180 : 220)
+            Text(total > 0
+                 ? "\(Int(100 * Double(bytesReceived) / Double(total)))%"
+                 : String(format: "%.1f KB", Double(bytesReceived) / 1024))
                 .font(.system(size: AppFont.caption))
                 .foregroundStyle(AppColor.text2)
         }
@@ -347,51 +261,40 @@ struct LiveViewCanvas: View {
     private var guideOverlay: some View {
         Canvas { context, size in
             let fullRect = CGRect(origin: .zero, size: size)
-
-            // Guide semantics (revised 2026-07-19 per user feedback): in VIDEO mode the crop is
-            // a fact of the camera (FHD/4K always record 16:9 and the format can't be changed
-            // remotely), so the crop overlay is ALWAYS shown there and guides follow it - the
-            // toggle has no meaning. In PHOTO mode the crop is a choice (the aspect setting),
-            // so the toggle governs both the overlay AND what the guides span: crop on ->
-            // guides inside the capture area; crop off -> guides across the whole visible
-            // frame. 2K is the video exception with no crop at all (4:3 full sensor, measured) -
-            // its rect equals the full frame, so nothing extra is drawn.
             var guideRect = fullRect
             let cropShown = mode == .video || showCrop
 
             if isRecording {
                 context.draw(
-                    Text("● Recording — live view now shows the actual crop & exposure")
-                        .font(.system(size: 10))
+                    Text("● 正在录像 — 当前画面为实际裁切与曝光")
+                        .font(.system(size: AppLayout.isFourInchPhone ? 9 : 10))
                         .foregroundColor(AppColor.record),
-                    at: CGPoint(x: 8, y: 10), anchor: .topLeading
+                    at: CGPoint(x: 8, y: 10),
+                    anchor: .topLeading
                 )
             } else if cropShown, let cropRect = crop() {
                 let rect = cropCGRect(visualCrop(cropRect), in: fullRect)
                 if rect != fullRect {
                     guideRect = rect
-                    // Dim everything OUTSIDE the capture area (user request 2026-07-12): the
-                    // preview is wider than what actually gets recorded, so the to-be-cropped
-                    // margins render darker while the real frame keeps full brightness. Even-odd
-                    // fill of (full frame + crop rect) paints exactly the outside band.
                     var outside = Path()
                     outside.addRect(fullRect)
                     outside.addRect(rect)
-                    context.fill(outside, with: .color(.black.opacity(0.45)), style: FillStyle(eoFill: true))
+                    context.fill(
+                        outside,
+                        with: .color(.black.opacity(0.45)),
+                        style: FillStyle(eoFill: true)
+                    )
                 }
-                // The outline draws even when the crop IS the full frame in PHOTO mode (4:3):
-                // the toggle is tappable there, and a tap with zero visible change reads as
-                // broken (user feedback 2026-07-19). Video has no tappable toggle, so its
-                // full-frame case (2K) stays clean.
                 if mode == .photo || rect != fullRect {
                     drawCropOutline(rect, in: &context)
                 }
             } else if cropShown, mode == .photo {
                 context.draw(
-                    Text("photo aspect not known yet")
-                        .font(.system(size: 10))
+                    Text("尚未读取照片画幅比例")
+                        .font(.system(size: AppLayout.isFourInchPhone ? 9 : 10))
                         .foregroundColor(AppColor.accent),
-                    at: CGPoint(x: 8, y: fullRect.maxY - 10), anchor: .bottomLeading
+                    at: CGPoint(x: 8, y: fullRect.maxY - 10),
+                    anchor: .bottomLeading
                 )
             }
 
@@ -420,11 +323,11 @@ struct LiveViewCanvas: View {
     }
 
     private func crop() -> CropRect? {
-        mode == .video ? MeasuredCrops.videoCrop(forFormat: videoFormat) : MeasuredCrops.photoCrop(forAspect: imageAspect)
+        mode == .video
+            ? MeasuredCrops.videoCrop(forFormat: videoFormat)
+            : MeasuredCrops.photoCrop(forAspect: imageAspect)
     }
 
-    /// Maps normalized crop fractions into canvas coordinates. Split from the outline drawing
-    /// because thirds/diagonals need this rect even when the dashed outline is toggled off.
     private func cropCGRect(_ crop: CropRect, in fullRect: CGRect) -> CGRect {
         CGRect(
             x: fullRect.minX + crop.x * fullRect.width,
@@ -434,24 +337,39 @@ struct LiveViewCanvas: View {
         )
     }
 
-    /// The dashed amber outline + label - drawn only when the Crop toggle is on.
     private func drawCropOutline(_ rect: CGRect, in context: inout GraphicsContext) {
         var path = Path()
         path.addRect(rect)
-        context.stroke(path, with: .color(AppColor.accent.opacity(0.9)), style: StrokeStyle(lineWidth: 2, dash: [6, 4]))
+        context.stroke(
+            path,
+            with: .color(AppColor.accent.opacity(0.9)),
+            style: StrokeStyle(lineWidth: 2, dash: [6, 4])
+        )
 
-        let label = mode == .video ? "video crop · \(videoFormat ?? "?")" : "photo crop · \(imageAspect ?? "?")"
+        let label = mode == .video
+            ? "视频裁切 · \(videoFormat ?? "?")"
+            : "照片裁切 · \(imageAspect ?? "?")"
         context.draw(
-            Text(label).font(.system(size: 10)).foregroundColor(AppColor.accent),
-            at: CGPoint(x: rect.minX + 6, y: rect.minY + 8), anchor: .topLeading
+            Text(label)
+                .font(.system(size: AppLayout.isFourInchPhone ? 9 : 10))
+                .foregroundColor(AppColor.accent),
+            at: CGPoint(x: rect.minX + 6, y: rect.minY + 8),
+            anchor: .topLeading
         )
     }
 
     static func fittedRect(imageSize: CGSize, in containerSize: CGSize) -> CGRect {
-        guard imageSize.width > 0, imageSize.height > 0 else { return CGRect(origin: .zero, size: containerSize) }
+        guard imageSize.width > 0, imageSize.height > 0 else {
+            return CGRect(origin: .zero, size: containerSize)
+        }
         let scale = min(containerSize.width / imageSize.width, containerSize.height / imageSize.height)
         let width = imageSize.width * scale
         let height = imageSize.height * scale
-        return CGRect(x: (containerSize.width - width) / 2, y: (containerSize.height - height) / 2, width: width, height: height)
+        return CGRect(
+            x: (containerSize.width - width) / 2,
+            y: (containerSize.height - height) / 2,
+            width: width,
+            height: height
+        )
     }
 }
