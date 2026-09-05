@@ -1,8 +1,3 @@
-// Browse/download/delete files on the camera's SD card - port of main_window.py's
-// FileBrowserDialog, reworked 2026-07-11 (user feedback: swipe-to-reveal actions were
-// unintuitive). Now: thumbnails per row, tap a row -> FileDetailView with explicit
-// Save-to-Photos/Share/Delete buttons, and a Select mode for batch delete/save. Swipe actions are
-// kept as a shortcut for anyone who already reached for them.
 import SwiftUI
 import YiM1Core
 
@@ -29,11 +24,11 @@ struct FileBrowserView<Session: CameraSessionProtocol>: View {
     var body: some View {
         NavigationView {
             content
-                .navigationTitle("Camera files")
+                .navigationTitle("相机文件")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button(editMode == .active ? "Done" : "Close") {
+                        Button(editMode == .active ? "完成" : "关闭") {
                             if editMode == .active {
                                 exitSelectionMode()
                             } else {
@@ -43,8 +38,11 @@ struct FileBrowserView<Session: CameraSessionProtocol>: View {
                     }
                     ToolbarItemGroup(placement: .confirmationAction) {
                         if editMode != .active {
-                            Button("Select") { editMode = .active }
-                            Button { Task { await refresh() } } label: { Image(systemName: "arrow.clockwise") }
+                            Button("选择") { editMode = .active }
+                            Button { Task { await refresh() } } label: {
+                                Image(systemName: "arrow.clockwise")
+                            }
+                            .accessibilityLabel("刷新")
                         }
                     }
                     ToolbarItemGroup(placement: .bottomBar) {
@@ -52,14 +50,14 @@ struct FileBrowserView<Session: CameraSessionProtocol>: View {
                             Button(role: .destructive) {
                                 pendingDeletePaths = Array(selectedPaths)
                             } label: {
-                                Text("Delete (\(selectedPaths.count))")
+                                Text("删除（\(selectedPaths.count)）")
                             }
                             .disabled(selectedPaths.isEmpty || isBatchWorking)
                             Spacer()
                             Button {
                                 Task { await batchSaveToPhotos() }
                             } label: {
-                                Text("Save to Photos (\(selectedPaths.count))")
+                                Text("存入照片（\(selectedPaths.count)）")
                             }
                             .disabled(selectedPaths.isEmpty || isBatchWorking)
                         }
@@ -72,12 +70,12 @@ struct FileBrowserView<Session: CameraSessionProtocol>: View {
         .sheet(item: $shareItem) { item in
             ActivityView(activityItems: [item.url])
         }
-        .alert(pendingDeletePaths?.count == 1 ? "Delete file?" : "Delete files?", isPresented: Binding(
+        .alert(pendingDeletePaths?.count == 1 ? "删除文件？" : "删除多个文件？", isPresented: Binding(
             get: { pendingDeletePaths != nil },
             set: { if !$0 { pendingDeletePaths = nil } }
         )) {
-            Button("Cancel", role: .cancel) { pendingDeletePaths = nil }
-            Button("Delete", role: .destructive) {
+            Button("取消", role: .cancel) { pendingDeletePaths = nil }
+            Button("删除", role: .destructive) {
                 if let paths = pendingDeletePaths { Task { await performDelete(paths) } }
                 pendingDeletePaths = nil
             }
@@ -93,9 +91,9 @@ struct FileBrowserView<Session: CameraSessionProtocol>: View {
     private var deleteConfirmationMessage: String {
         guard let paths = pendingDeletePaths else { return "" }
         if paths.count == 1, let file = files.first(where: { $0.path == paths[0] }) {
-            return "Delete \(file.filename) from the camera? This cannot be undone."
+            return "确定从相机中删除 \(file.filename) 吗？此操作无法撤销。"
         }
-        return "Delete \(paths.count) files from the camera? This cannot be undone."
+        return "确定从相机中删除这 \(paths.count) 个文件吗？此操作无法撤销。"
     }
 
     @ViewBuilder
@@ -104,9 +102,14 @@ struct FileBrowserView<Session: CameraSessionProtocol>: View {
         case .loading:
             ProgressView().tint(AppColor.accent)
         case .empty:
-            Text("(no files)").foregroundStyle(AppColor.text3)
+            Text("暂无文件").foregroundStyle(AppColor.text3)
         case .error(let message):
-            ScrollView { Text(message).foregroundStyle(AppColor.text3).padding() }
+            ScrollView {
+                Text(message)
+                    .font(.system(size: AppFont.body))
+                    .foregroundStyle(AppColor.text3)
+                    .padding()
+            }
         case .loaded:
             List(selection: $selectedPaths) {
                 ForEach(files) { file in
@@ -118,10 +121,10 @@ struct FileBrowserView<Session: CameraSessionProtocol>: View {
                     .listRowBackground(AppColor.surface)
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) { pendingDeletePaths = [file.path] } label: {
-                            Label("Delete", systemImage: AppIcon.trash)
+                            Label("删除", systemImage: AppIcon.trash)
                         }
                         Button { Task { await download(file) } } label: {
-                            Label("Download", systemImage: AppIcon.download)
+                            Label("下载", systemImage: AppIcon.download)
                         }
                         .tint(AppColor.accent)
                     }
@@ -135,7 +138,10 @@ struct FileBrowserView<Session: CameraSessionProtocol>: View {
         HStack(spacing: AppSpace.md) {
             thumbnailView(file)
             VStack(alignment: .leading, spacing: 2) {
-                Text(file.filename).foregroundStyle(AppColor.text)
+                Text(file.filename)
+                    .font(.system(size: AppFont.body))
+                    .foregroundStyle(AppColor.text)
+                    .lineLimit(1)
                 HStack(spacing: 6) {
                     Text(file.filetype).foregroundStyle(AppColor.text3)
                     if let date = file.date {
@@ -152,7 +158,8 @@ struct FileBrowserView<Session: CameraSessionProtocol>: View {
     }
 
     private func thumbnailView(_ file: CameraFile) -> some View {
-        ZStack {
+        let side: CGFloat = AppLayout.isFourInchPhone ? 50 : 56
+        return ZStack {
             RoundedRectangle(cornerRadius: 6).fill(AppColor.surface2)
             if let image = thumbnails.image(for: file) {
                 Image(uiImage: image)
@@ -165,7 +172,7 @@ struct FileBrowserView<Session: CameraSessionProtocol>: View {
                     .foregroundStyle(AppColor.text3)
             }
         }
-        .frame(width: 56, height: 56)
+        .frame(width: side, height: side)
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .task(id: file.path) {
             await thumbnails.load(file, session: session)
@@ -174,12 +181,12 @@ struct FileBrowserView<Session: CameraSessionProtocol>: View {
 
     private var downloadOverlay: some View {
         VStack(spacing: AppSpace.sm) {
-            Text("Downloading…")
+            Text("正在下载…")
                 .font(.system(size: AppFont.small))
                 .foregroundStyle(AppColor.text)
             ProgressView(value: downloadProgress.total > 0 ? Double(downloadProgress.received) / Double(downloadProgress.total) : nil)
                 .tint(AppColor.accent)
-                .frame(maxWidth: 220)
+                .frame(maxWidth: AppLayout.isFourInchPhone ? 180 : 220)
         }
         .padding(AppSpace.lg)
         .background(AppColor.surface2)
@@ -191,8 +198,7 @@ struct FileBrowserView<Session: CameraSessionProtocol>: View {
             Text(batchWorkingLabel)
                 .font(.system(size: AppFont.small))
                 .foregroundStyle(AppColor.text)
-            ProgressView()
-                .tint(AppColor.accent)
+            ProgressView().tint(AppColor.accent)
         }
         .padding(AppSpace.lg)
         .background(AppColor.surface2)
@@ -211,11 +217,11 @@ struct FileBrowserView<Session: CameraSessionProtocol>: View {
             files = list.sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
             loadState = files.isEmpty ? .empty : .loaded
         case .unrecognized(let raw):
-            loadState = .error("Unrecognized response shape:\n\(raw)")
+            loadState = .error("无法识别相机返回的数据：\n\(raw)")
         case .httpError(let status, let preview):
-            loadState = .error("GetFileList failed (status=\(status)):\n\(preview)")
+            loadState = .error("读取文件列表失败（状态码 \(status)）：\n\(preview)")
         case .parseFailure(let preview):
-            loadState = .error("Could not parse response:\n\(preview)")
+            loadState = .error("无法解析相机返回的数据：\n\(preview)")
         }
     }
 
@@ -231,7 +237,7 @@ struct FileBrowserView<Session: CameraSessionProtocol>: View {
             shareItem = ShareItem(url: tmpURL)
         } catch {
             downloadingPath = nil
-            loadState = .error("Download failed: \(error)")
+            loadState = .error("下载失败：\(error)")
         }
     }
 
@@ -240,32 +246,29 @@ struct FileBrowserView<Session: CameraSessionProtocol>: View {
             selectedPaths.subtract(paths)
             await refresh()
         } else {
-            loadState = .error("Delete failed for \(paths.count == 1 ? "the selected file" : "\(paths.count) files")")
+            loadState = .error(paths.count == 1 ? "删除所选文件失败。" : "删除 \(paths.count) 个文件失败。")
         }
     }
 
-    /// Sequential (not parallel) - the camera only handles one HTTP request at a time, so
-    /// downloading files concurrently would just queue up anyway; sequential also lets progress
-    /// be reported meaningfully as "N of M" instead of several bars moving at once.
     private func batchSaveToPhotos() async {
         let targets = files.filter { selectedPaths.contains($0.path) }
         guard !targets.isEmpty else { return }
 
         isBatchWorking = true
-        batchWorkingLabel = "Saving 0 of \(targets.count)…"
+        batchWorkingLabel = "正在保存 0 / \(targets.count)…"
         defer { isBatchWorking = false }
 
         guard await PhotoLibrarySaver.requestAuthorization() else {
-            loadState = .error("Photos access was denied. Enable it in Settings to save files.")
+            loadState = .error("没有“照片”访问权限。请在系统设置中允许后再保存。")
             return
         }
 
         for (index, file) in targets.enumerated() {
-            batchWorkingLabel = "Saving \(index + 1) of \(targets.count)…"
+            batchWorkingLabel = "正在保存 \(index + 1) / \(targets.count)…"
             do {
                 try await PhotoLibrarySaver.downloadAndSave(file, session: session) { _ in }
             } catch {
-                loadState = .error("Saved \(index) of \(targets.count) - stopped after \(file.filename) failed: \(error)")
+                loadState = .error("已保存 \(index) / \(targets.count)，\(file.filename) 保存失败：\(error)")
                 return
             }
         }
