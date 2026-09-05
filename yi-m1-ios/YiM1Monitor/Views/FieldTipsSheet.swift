@@ -26,7 +26,7 @@ struct FieldTipsSheet: View {
     ]
 
     var body: some View {
-        NavigationStack {
+        NavigationView {
             List(tips) { tip in
                 HStack(alignment: .top, spacing: AppSpace.md) {
                     Image(systemName: tip.icon)
@@ -40,7 +40,6 @@ struct FieldTipsSheet: View {
                 .padding(.vertical, AppSpace.xs)
                 .listRowBackground(AppColor.surface)
             }
-            .scrollContentBackground(.hidden)
             .background(AppColor.bg)
             .navigationTitle("For a stable session")
             .navigationBarTitleDisplayMode(.inline)
@@ -50,6 +49,6 @@ struct FieldTipsSheet: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .navigationViewStyle(.stack)
     }
 }

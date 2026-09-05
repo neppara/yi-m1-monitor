@@ -54,7 +54,6 @@ struct RootView<Session: CameraSessionProtocol>: View {
         .sheet(isPresented: wifiJoinPresented) {
             if let credentials = session.pendingWiFiCredentials {
                 WiFiJoinSheet(session: session, credentials: credentials)
-                    .presentationDetents([.medium])
             }
         }
         .onChange(of: session.isRecording) { recording in

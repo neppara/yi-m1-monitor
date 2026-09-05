@@ -27,7 +27,7 @@ struct FileBrowserView<Session: CameraSessionProtocol>: View {
     @State private var batchWorkingLabel = ""
 
     var body: some View {
-        NavigationStack {
+        NavigationView {
             content
                 .navigationTitle("Camera files")
                 .navigationBarTitleDisplayMode(.inline)
@@ -67,6 +67,7 @@ struct FileBrowserView<Session: CameraSessionProtocol>: View {
                 }
                 .background(AppColor.bg)
         }
+        .navigationViewStyle(.stack)
         .task { await refresh() }
         .sheet(item: $shareItem) { item in
             ActivityView(activityItems: [item.url])
@@ -127,7 +128,6 @@ struct FileBrowserView<Session: CameraSessionProtocol>: View {
                 }
             }
             .environment(\.editMode, $editMode)
-            .scrollContentBackground(.hidden)
         }
     }
 

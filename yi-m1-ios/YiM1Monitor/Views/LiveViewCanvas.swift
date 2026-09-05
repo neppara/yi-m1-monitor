@@ -178,16 +178,23 @@ struct LiveViewCanvas: View {
             // the cropped 16:9 one in place, centered the whole way.
             .animation(.easeInOut(duration: 0.25), value: recordingBarsCropApplies)
             .contentShape(Rectangle())
-            .onTapGesture { location in
-                guard let rawImage = frameDecoder.image else { return }
-                let liveImage = recordingDisplayImage(rawImage)
-                let fitted = Self.fittedRect(imageSize: displaySize(of: liveImage.size), in: geo.size)
-                guard fitted.contains(location) else { return }
-                let relX = (location.x - fitted.minX) / fitted.width
-                let relY = (location.y - fitted.minY) / fitted.height
-                let sensor = sensorRelativePoint(fromVisual: CGPoint(x: relX, y: relY))
-                onFocus(Int(sensor.x * liveImage.size.width), Int(sensor.y * liveImage.size.height))
-            }
+            // iOS 15-compatible tap-location capture. SwiftUI's coordinate-returning
+            // onTapGesture is iOS 17+, so a zero-distance DragGesture is used instead.
+            // Handling only onEnded preserves tap-to-focus semantics while exposing location.
+            .gesture(
+                DragGesture(minimumDistance: 0, coordinateSpace: .local)
+                    .onEnded { value in
+                        let location = value.location
+                        guard let rawImage = frameDecoder.image else { return }
+                        let liveImage = recordingDisplayImage(rawImage)
+                        let fitted = Self.fittedRect(imageSize: displaySize(of: liveImage.size), in: geo.size)
+                        guard fitted.contains(location) else { return }
+                        let relX = (location.x - fitted.minX) / fitted.width
+                        let relY = (location.y - fitted.minY) / fitted.height
+                        let sensor = sensorRelativePoint(fromVisual: CGPoint(x: relX, y: relY))
+                        onFocus(Int(sensor.x * liveImage.size.width), Int(sensor.y * liveImage.size.height))
+                    }
+            )
         }
         .background(AppColor.liveBG)
         .clipped()
