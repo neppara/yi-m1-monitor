@@ -24,11 +24,11 @@
 		<true/>
 	</dict>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>YI M1 Monitor uses Bluetooth to pair with your camera and read its Wi-Fi credentials.</string>
+	<string>YI M1 Monitor 需要使用蓝牙与相机配对，并读取相机本次生成的 Wi-Fi 连接信息。</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>YI M1 Monitor connects to your camera over its own Wi-Fi network to show live view and send camera commands.</string>
+	<string>YI M1 Monitor 需要连接相机自身的 Wi-Fi 网络，以显示实时取景并发送相机控制指令。</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>YI M1 Monitor saves downloaded photos and videos to your Photos library.</string>
+	<string>YI M1 Monitor 需要将从相机下载的照片和视频保存到系统照片图库。</string>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>
